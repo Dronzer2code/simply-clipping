@@ -1,0 +1,35 @@
+# Virtual environment
+.venv/
+
+# Generated and cached data (FastF1 / OpenF1 caches, Real Race parquet, runs).
+# data/* (not data/) so the data/tracks exception below can take effect: git
+# never looks inside a directory that is ignored as a whole.
+data/*
+
+# Gemma GGUF model files (R3)
+models/
+
+# Python bytecode
+__pycache__/
+*.py[cod]
+
+# Parquet artefacts
+*.parquet
+
+# Built track models ARE committed (PF-01, owner decision round 6): building
+# needs network, the files are small, and a committed track lets the project
+# run with no network at all. Must come after the *.parquet rule.
+!data/tracks/
+!data/tracks/*.parquet
+
+# Packaging / tooling caches
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# graphify knowledge graph: share the graph, keep the machine-local cache and state out
+graphify-out/*
+!graphify-out/graph.json
+!graphify-out/graph.html
+!graphify-out/GRAPH_REPORT.md
