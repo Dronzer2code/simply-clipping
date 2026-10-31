@@ -250,6 +250,35 @@ with the placeholders). Checks kept under `data/runs/_tools/` (gitignored):
 `rehearse_demo.py` (headless DEMO_HACKATHON run, matched the script) and
 `ui_smoke.py` (setup screen → pit wall, 4 scenarios, 22 checks, all OK).
 
+## GRAPHIFY TRACK (2026-10-31, main, repo `Dronzer2code/simply-clipping`)
+
+Owner prompt "GRAPHIFY TRACK - race comparison graphs" (replaced the earlier graphify
+prompt). Steps G-1…G-4, one commit each. Spike (step 0): graphify 0.9.96 (`graphifyy`,
+a uv tool, not importable) runs `query / path / explain --graph <file>` on a graph.json
+we write; its `graph.html` loads vis-network from unpkg (no internet at the venue),
+drops custom node fields and colours by community; `cluster-only` re-clusters (our
+battle groups lost). So: graph.json in graphify's schema, our own offline viewer and
+report, graphify for questions.
+
+- `pitwall_sim/graph/`: `record.py` (RaceRecord from a finished live session or an
+  export; battles = the Reveal's rule for every pair; truth checks = Test mode's rule;
+  refuses before the flag), `race_graph.py` (graph.json, labels.json, race_report.md,
+  graph.html), `dashboard.py` (dashboard.html: tiles, chord, rival read accuracy),
+  `ask.py` (presets + `graphify query`), `race.py` CLI (`--run`, `--simulate`).
+  vis-network 9.1.6 + d3 7.9.0 vendored in `graph/vendor/`.
+- Reveal recorder also keeps public order/intervals, true speeds and each alert's true
+  battery, released after the flag only (`LiveSession.reveal_samples`).
+- UI: Reveal tab "Open race graph" / "Open race dashboard" / "Ask the pit wall"
+  (`ui/race_graph_panel.py`, QThreads; rebuilt once the costs are in).
+- Demo (seed 2, 15 laps, SC lap 7, the demo's calls): P5, 14 alerts (4/9 right),
+  11 calls, +8.3 s, radar MAE 1.11 MJ; main rival ANT (614 s, radar MAE 1.91 MJ, both
+  ATTACKs wrong: est 0.1 vs true 2.5 MJ). Script: DEMO_HACKATHON "Graphify moment".
+- Choices made by the agent: closing-speed incident = car behind faster by
+  `alerts.closing_dv_kmh`, car ahead at least 150 km/h and not braking (> 40 km/h drop
+  per second) (samples carry no energy states); led_to confidence = 0.5 + 0.45 (1 -
+  exp(-|cost| / 2 s)); battle groups = heaviest battle pairs first, at most 5 cars,
+  battles of 5 s and more; estimate accuracy = 1 - MAE / 4 MJ (owner's formula).
+
 ## KNOWN ISSUES
 
 - Full race distance: every car runs out of fuel at laps 41-46 of 53 (DNF "out

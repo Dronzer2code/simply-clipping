@@ -177,6 +177,38 @@ Hamilton (laps 47 and 50), 15 s and 20 s before Hamilton re-passed; the lap-22
 Bearman / Colapinto crash is not caught (Bearman's speed channel is frozen before
 the impact). Demo script: `docs/guides/DEMO_SC.md`.
 
+## Race graphs (Graphify)
+
+After the chequered flag every race becomes a graph of Our Car against every rival
+(`pitwall_sim/graph/`), written to `graphify-out/races/<run_id>/`:
+
+- `graph.json` in graphify's schema: nodes Car (all 22, Our Car marked, per-rival
+  stats: time within 1 s, passes made / lost, alerts by type and how many were right,
+  radar error, call cost, max closing speed, lap-time delta), Battle (two cars within
+  1 s), Alert, TruthCheck (rival's true battery, estimate error, right / wrong), Call,
+  Outcome, CallCost, Incident (Safety Car / VSC, passes, closing speed). Facts are
+  EXTRACTED; "call led to outcome" is INFERRED, with a confidence from the paired-fork
+  cost. Communities are battle groups, named after their cars ("GAS-BEA-BOR battle").
+- `graph.html`: the graph in the browser (offline; Our Car in the middle, team colours,
+  search, stats per car). `dashboard.html`: tiles, a chord diagram of who raced whom
+  (battles / passes / alerts, "only battles with my car") and the rival read accuracy.
+- `race_report.md` (rivals fought most, battle groups, wrong alerts, call costs) and
+  `race_record.json` (the saved race; rebuild with `--run`).
+
+The pit wall builds them at the flag: Reveal tab, **Open race graph** / **Open race
+dashboard**, and **Ask the pit wall** (presets, or any question through
+`graphify query` when graphify is installed: `pip install graphifyy`).
+
+```powershell
+# A headless demo race (seed 2, 15 laps, Safety Car on lap 7, the demo's calls and costs)
+python -m pitwall_sim.graph.race --simulate --seed 2 --laps 15 --our GAS --sc-lap 7
+# From an export folder (built-in alerts, or an estimator's with --alerts / --estimates)
+python -m pitwall_sim.graph.race --run data/exports/suzuka_normal_s42
+# Ask the graph
+graphify path "GAS" "BOR" --graph graphify-out/races/live_suzuka_s2_GAS_15l/graph.json --undirected
+graphify query "which alerts were wrong" --graph graphify-out/races/live_suzuka_s2_GAS_15l/graph.json
+```
+
 ## Where things are
 
 | Path | What |
@@ -187,6 +219,7 @@ the impact). Demo script: `docs/guides/DEMO_SC.md`.
 | `pitwall_sim/engineer/` | Engineer Commands, call options, call outcome check |
 | `pitwall_sim/live/` | Live session (no Qt), setup presets |
 | `pitwall_sim/ui/` | Setup screen and live pit wall |
+| `pitwall_sim/graph/` | Race comparison graph, race dashboard, "Ask the pit wall" (Graphify track) |
 | `simply_clipping/` | The owner's battery estimator and alerts (plug-in), `config.yaml`, tests |
 | `config/` | Rule Sets, grid, teams, tyres, Suzuka, `app.yaml` (every tunable value) |
 | `docs/` | PRD, MVP, TRD, process flow, UI design, tasks, setup, sprint |

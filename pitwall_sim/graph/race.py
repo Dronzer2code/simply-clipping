@@ -2,12 +2,13 @@
 
     python -m pitwall_sim.graph.race --run data/exports/suzuka_normal_s42
     python -m pitwall_sim.graph.race --run graphify-out/races/live_suzuka_s2_GAS_15l
-    python -m pitwall_sim.graph.race --simulate --seed 2 --laps 15 --our GAS
+    python -m pitwall_sim.graph.race --simulate --seed 2 --laps 15 --our GAS --sc-lap 7
 
 ``--run``: an export folder (``run.json``), a saved live race (``race_record.json``,
 written next to every graph), or the folder holding one. ``--simulate``: run a live
-race headless with an automatic engineer (answers every alert with its first
-option, sends the demo radio call), compute the decision costs, then graph it.
+race headless with an automatic engineer playing the demo's calls (ATTACK /
+DEFEND alerts answered with their first option, the lap-2 radio call, "box box,
+mediums" under the Safety Car), compute the decision costs, then graph it.
 Output: ``graphify-out/races/<run_id>/`` (``--out`` to change): ``graph.json``
 (graphify schema), ``graph.html``, ``dashboard.html``, ``race_report.md``,
 ``race_record.json``, ``labels.json``, ``lib/`` (the vendored JS libraries).
@@ -27,7 +28,11 @@ from pitwall_sim.live.session import LiveSession, LiveSetup
 logger = logging.getLogger(__name__)
 OUT_ROOT = DEFAULT_CONFIG_DIR.resolve().parent / "graphify-out" / "races"
 DEMO_RADIO = "Save this lap, attack into turn 1 next lap"
-"""The demo's radio call (docs/guides/DEMO_HACKATHON.md)."""
+"""The demo's radio call on lap 2 (docs/guides/DEMO_HACKATHON.md)."""
+DEMO_SC_RADIO = "box box, mediums"
+"""The demo's call when the Safety Car comes out."""
+ANSWERED = ("ATTACK", "DEFEND")
+"""Alerts the automatic engineer answers (option 1, F1); the others expire (Resume)."""
 
 
 def graph_session(session: LiveSession, out_root: Path = OUT_ROOT) -> RaceGraphPaths:
@@ -49,26 +54,32 @@ def load_run(path: Path, config_dir: Path = DEFAULT_CONFIG_DIR, alerts: Path | N
 
 
 def simulate(seed: int, laps: int, our: str, config_dir: Path = DEFAULT_CONFIG_DIR,
-             radio_lap: int | None = 3, costs: bool = True, test_mode: bool = False,
-             scripted_sc_lap: int | None = None) -> LiveSession:  # fmt: skip
+             radio_lap: int | None = 2, costs: bool = True, test_mode: bool = False,
+             scripted_sc_lap: int | None = None,
+             sc_radio: str | None = DEMO_SC_RADIO) -> LiveSession:  # fmt: skip
     """Run a live race headless with an automatic engineer, to the flag (and its costs).
 
-    The engineer answers every alert with its first option and, on ``radio_lap``,
-    sends the demo radio call. Every call goes through the session (validation,
-    snapshots), exactly as the pit wall's would.
+    The engineer plays the demo (docs/guides/DEMO_HACKATHON.md): it answers every
+    ATTACK / DEFEND alert with its first option (the others expire), sends the demo
+    radio call on ``radio_lap`` and ``sc_radio`` when the Safety Car comes out. Every
+    call goes through the session (validation, snapshots), as the pit wall's would.
+    ``scripted_sc_lap`` None: the config's ``demo.scripted_sc_lap``.
     """
     session = LiveSession(LiveSetup(our_driver_id=our, seed=seed, laps=laps,
                                     test_mode=test_mode, scripted_sc_lap=scripted_sc_lap),
                           config_dir)  # fmt: skip
-    said = False
+    said = boxed = False
     while session.advance(1.0):
         frame = session.frame()
         for alert in frame.alerts:
-            if frame.options.get(alert.alert_id):
+            if alert.type in ANSWERED and frame.options.get(alert.alert_id):
                 session.call(alert.alert_id, 1)
         if radio_lap is not None and not said and frame.view.our_car.lap + 1 >= radio_lap:
             session.radio_message(DEMO_RADIO)
             said = True
+        if sc_radio and not boxed and frame.view.track_status.status == "SC":
+            session.radio_message(sc_radio)
+            boxed = True
     if costs:
         for index in range(len(session.call_log)):
             session.compute_cost(index)
@@ -89,6 +100,7 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--seed", type=int, default=2)
     parser.add_argument("--laps", type=int, default=15)
     parser.add_argument("--our", default="GAS")
+    parser.add_argument("--sc-lap", type=int, help="simulate: Safety Car on this lap (demo: 7)")
     parser.add_argument("--no-costs", action="store_true", help="simulate: skip the decision costs")
     parser.add_argument("--test-mode", action="store_true", help="simulate: Test mode on")
     parser.add_argument("--config-dir", type=Path, default=DEFAULT_CONFIG_DIR)
@@ -96,7 +108,8 @@ def main(argv: list[str] | None = None) -> None:
     logging.basicConfig(level=logging.WARNING, format="%(levelname)s %(name)s: %(message)s")
     if args.simulate:
         session = simulate(args.seed, args.laps, args.our, args.config_dir,
-                           costs=not args.no_costs, test_mode=args.test_mode)  # fmt: skip
+                           costs=not args.no_costs, test_mode=args.test_mode,
+                           scripted_sc_lap=args.sc_lap)  # fmt: skip
         try:
             record = from_session(session)
         finally:

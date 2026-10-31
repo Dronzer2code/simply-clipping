@@ -106,6 +106,7 @@ GENERATED FILES).
 | Looking for | Go to |
 | --- | --- |
 | Meaning of a term (Our Car, Rival, Ground Truth, Radar Estimate, Energy Mode, super-clip, …) | `spec/PRD.md` GLOSSARY |
+| Race comparison graph / race dashboard of one race (Graphify track) | root `README.md` "Race graphs (Graphify)"; code `pitwall_sim/graph/`; output `graphify-out/races/<run_id>/`; demo moment in `guides/DEMO_HACKATHON.md` |
 | Feature `F01`–`F20` | `spec/PRD.md` FEATURES |
 | Requirement `FR-*` / `NFR-*` | `spec/PRD.md` FUNCTIONAL / NON-FUNCTIONAL REQUIREMENTS |
 | Owner decisions (dated) | `spec/PRD.md` DECISIONS LOG; sprint decisions in `planning/SPRINT.md`; later ones in `status/SESSION_CONTEXT.md` |
