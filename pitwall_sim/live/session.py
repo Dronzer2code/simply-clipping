@@ -265,6 +265,11 @@ class LiveSession:
                     break
             return not self.engine.finished
 
+    @property
+    def _race_over(self) -> bool:
+        """Chequered flag out: no more pit plans (the cars still cross the line after it)."""
+        return self.engine.finished or self.engine.flag == "CHEQUERED"
+
     def resume(self) -> None:
         """Continue after a pause on alert."""
         with self._lock:
@@ -272,7 +277,8 @@ class LiveSession:
 
     def _after_tick(self) -> None:
         self._view = view = self._builder.build()
-        self._reveal.sample(view, self._truth_mj())
+        if not self._race_over:  # the Reveal plots end at the flag, not the cool-down
+            self._reveal.sample(view, self._truth_mj())
         self._reveal.after(view, self.engine.finished)
         self._strategy_upkeep(view)
         if not self.engine.finished and (said := self._driver_radio.update(view)):
@@ -514,7 +520,7 @@ class LiveSession:
             self._builder.strategy = worker.result
             self.strategy_lap = worker.result_lap
         lap = view.our_car.lap + 1
-        if lap != self._strategy_lap and lap >= 1 and not self.engine.finished:
+        if lap != self._strategy_lap and lap >= 1 and not self._race_over:
             if self.refresh_strategy():
                 self._strategy_lap = lap
 
@@ -525,7 +531,7 @@ class LiveSession:
         hidden state before any fork (``strategy.public_snapshot``, HR-03).
         """
         worker = self._strategy
-        if worker is None or worker.busy or self.engine.finished:
+        if worker is None or worker.busy or self._race_over:
             return False
         view = self._view
         return worker.submit(self.engine.snapshot(), self.setup.our_driver_id,
