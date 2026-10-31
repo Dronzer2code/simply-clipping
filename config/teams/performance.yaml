@@ -1,0 +1,436 @@
+# F02 / FR-SIM-02 per-team power unit, aero and strategy coefficients.
+#
+# One entry per team_id appearing in config/grid/real_2026.yaml or
+# config/grid/fictional.yaml. Keys are team_id (HR-06).
+#
+# EVERY numeric value below is a placeholder, marked "# PLACEHOLDER: calibrate",
+# and is identical for all teams. docs/spec/TRD.md marks these coefficients UNKNOWN
+# and leaves them to F20 calibration (T-026 for Suzuka), so no team is given an
+# invented advantage here (HR-09). The two power limits are not invented: they
+# are the Rule Set nominal values (power.p_ice_max_kw_nominal, power.p_k_max_kw)
+# repeated per team so calibration can move each team off them individually.
+#
+# strategy_style drives the Rival Strategy AI (F08); BALANCED is the neutral
+# option of the three, pending owner choice per team.
+#
+# Battery coefficients (T-022, TRD Battery): docs/spec/TRD.md names eta_discharge,
+# harvest_share and partial_harvest_max_kw but gives no values, so they are
+# placeholders like the rest: battery_discharge_efficiency (battery energy ->
+# MGU-K electrical power), brake_harvest_share (fraction of braking power the
+# MGU-K recovers; the rest is friction braking), partial_harvest_max_kw
+# (part-throttle harvest power cap).
+#
+# fuel_energy_density_mj_per_kg (T-023, TRD Fuel): docs/spec/TRD.md takes it from
+# config but gives no value; 43 MJ/kg is a typical petrol figure, per team
+# because fuel suppliers differ. Placeholder like the rest.
+#
+# long_grip_ratio (T-024, owner round 9): mu_long = mu_lat * long_grip_ratio
+# in the friction ellipse (traction and braking); default 1.0.
+#
+# pu_power_scale (T-026, owner round 10): per-team ICE power multiplier on
+# p_ice_max_kw, representing engine differences.
+#
+# T-026 calibrates cla_corner, cda_straight, cda_corner and pu_power_scale per
+# team, and long_grip_ratio (shared) plus tyres.yaml SOFT mu_base (shared),
+# within the physically plausible bounds in config/app.yaml calibration.bounds.
+# Calibrated lines carry their bounds and either '# CALIBRATED T-026 ...' or,
+# while the speed-RMSE limit is relaxed (owner round 11, until T-02A),
+# '# CALIBRATED-PROVISIONAL (T-026, RMSE limit relaxed) ...'.
+
+teams:
+  red_bull: # Red Bull (real_2026)
+    p_ice_max_kw: 400.0 # PLACEHOLDER: calibrate (Rule Set nominal)
+    pu_power_scale: 1.0294 # CALIBRATED-PROVISIONAL (T-02A fit 2) suzuka bounds 0.97-1.03
+    p_k_max_kw: 350.0 # PLACEHOLDER: calibrate (Rule Set nominal)
+    battery_discharge_efficiency: 0.95 # PLACEHOLDER: calibrate
+    brake_harvest_share: 0.50 # PLACEHOLDER: calibrate
+    partial_harvest_max_kw: 100.0 # PLACEHOLDER: calibrate
+    ice_efficiency: 0.50 # PLACEHOLDER: calibrate
+    fuel_energy_density_mj_per_kg: 43.0 # PLACEHOLDER: calibrate
+    driveline_efficiency: 0.95 # PLACEHOLDER: calibrate
+    cda_straight: 0.6683 # CALIBRATED-PROVISIONAL (T-02A fit 2) suzuka bounds 0.4-1
+    cda_corner: 1.5996 # CALIBRATED-PROVISIONAL (T-02A fit 2) suzuka bounds 0.7-1.6
+    cla_straight: 2.00 # PLACEHOLDER: calibrate
+    cla_corner: 4.8308 # CALIBRATED-PROVISIONAL (T-02A fit 2) suzuka bounds 2.5-6
+    long_grip_ratio: 0.8002 # CALIBRATED-PROVISIONAL (T-02A fit 2) suzuka bounds 0.8-1.2; shared
+    reliability_dnf_p_per_race: 0.05 # PLACEHOLDER: calibrate
+    aggression: 0.50 # PLACEHOLDER: calibrate
+    strategy_style: BALANCED # PLACEHOLDER: calibrate
+  ferrari: # Ferrari (real_2026)
+    p_ice_max_kw: 400.0 # PLACEHOLDER: calibrate (Rule Set nominal)
+    pu_power_scale: 1.0194 # CALIBRATED-PROVISIONAL (T-02A fit 2) suzuka bounds 0.97-1.03
+    p_k_max_kw: 350.0 # PLACEHOLDER: calibrate (Rule Set nominal)
+    battery_discharge_efficiency: 0.95 # PLACEHOLDER: calibrate
+    brake_harvest_share: 0.50 # PLACEHOLDER: calibrate
+    partial_harvest_max_kw: 100.0 # PLACEHOLDER: calibrate
+    ice_efficiency: 0.50 # PLACEHOLDER: calibrate
+    fuel_energy_density_mj_per_kg: 43.0 # PLACEHOLDER: calibrate
+    driveline_efficiency: 0.95 # PLACEHOLDER: calibrate
+    cda_straight: 0.8754 # CALIBRATED-PROVISIONAL (T-02A fit 2) suzuka bounds 0.4-1
+    cda_corner: 1.5638 # CALIBRATED-PROVISIONAL (T-02A fit 2) suzuka bounds 0.7-1.6
+    cla_straight: 2.00 # PLACEHOLDER: calibrate
+    cla_corner: 5.1326 # CALIBRATED-PROVISIONAL (T-02A fit 2) suzuka bounds 2.5-6
+    long_grip_ratio: 0.8002 # CALIBRATED-PROVISIONAL (T-02A fit 2) suzuka bounds 0.8-1.2; shared
+    reliability_dnf_p_per_race: 0.05 # PLACEHOLDER: calibrate
+    aggression: 0.50 # PLACEHOLDER: calibrate
+    strategy_style: BALANCED # PLACEHOLDER: calibrate
+  mercedes: # Mercedes (real_2026)
+    p_ice_max_kw: 400.0 # PLACEHOLDER: calibrate (Rule Set nominal)
+    pu_power_scale: 1.0272 # CALIBRATED-PROVISIONAL (T-02A fit 2) suzuka bounds 0.97-1.03
+    p_k_max_kw: 350.0 # PLACEHOLDER: calibrate (Rule Set nominal)
+    battery_discharge_efficiency: 0.95 # PLACEHOLDER: calibrate
+    brake_harvest_share: 0.50 # PLACEHOLDER: calibrate
+    partial_harvest_max_kw: 100.0 # PLACEHOLDER: calibrate
+    ice_efficiency: 0.50 # PLACEHOLDER: calibrate
+    fuel_energy_density_mj_per_kg: 43.0 # PLACEHOLDER: calibrate
+    driveline_efficiency: 0.95 # PLACEHOLDER: calibrate
+    cda_straight: 0.9799 # CALIBRATED-PROVISIONAL (T-02A fit 2) suzuka bounds 0.4-1
+    cda_corner: 1.3987 # CALIBRATED-PROVISIONAL (T-02A fit 2) suzuka bounds 0.7-1.6
+    cla_straight: 2.00 # PLACEHOLDER: calibrate
+    cla_corner: 5.1741 # CALIBRATED-PROVISIONAL (T-02A fit 2) suzuka bounds 2.5-6
+    long_grip_ratio: 0.8002 # CALIBRATED-PROVISIONAL (T-02A fit 2) suzuka bounds 0.8-1.2; shared
+    reliability_dnf_p_per_race: 0.05 # PLACEHOLDER: calibrate
+    aggression: 0.50 # PLACEHOLDER: calibrate
+    strategy_style: BALANCED # PLACEHOLDER: calibrate
+  mclaren: # McLaren (real_2026)
+    p_ice_max_kw: 400.0 # PLACEHOLDER: calibrate (Rule Set nominal)
+    pu_power_scale: 1.0300 # CALIBRATED-PROVISIONAL (T-02A fit 2) suzuka bounds 0.97-1.03
+    p_k_max_kw: 350.0 # PLACEHOLDER: calibrate (Rule Set nominal)
+    battery_discharge_efficiency: 0.95 # PLACEHOLDER: calibrate
+    brake_harvest_share: 0.50 # PLACEHOLDER: calibrate
+    partial_harvest_max_kw: 100.0 # PLACEHOLDER: calibrate
+    ice_efficiency: 0.50 # PLACEHOLDER: calibrate
+    fuel_energy_density_mj_per_kg: 43.0 # PLACEHOLDER: calibrate
+    driveline_efficiency: 0.95 # PLACEHOLDER: calibrate
+    cda_straight: 0.7457 # CALIBRATED-PROVISIONAL (T-02A fit 2) suzuka bounds 0.4-1
+    cda_corner: 1.5670 # CALIBRATED-PROVISIONAL (T-02A fit 2) suzuka bounds 0.7-1.6
+    cla_straight: 2.00 # PLACEHOLDER: calibrate
+    cla_corner: 5.0682 # CALIBRATED-PROVISIONAL (T-02A fit 2) suzuka bounds 2.5-6
+    long_grip_ratio: 0.8002 # CALIBRATED-PROVISIONAL (T-02A fit 2) suzuka bounds 0.8-1.2; shared
+    reliability_dnf_p_per_race: 0.05 # PLACEHOLDER: calibrate
+    aggression: 0.50 # PLACEHOLDER: calibrate
+    strategy_style: BALANCED # PLACEHOLDER: calibrate
+  rb: # RB F1 Team (real_2026)
+    p_ice_max_kw: 400.0 # PLACEHOLDER: calibrate (Rule Set nominal)
+    pu_power_scale: 1.0235 # CALIBRATED-PROVISIONAL (T-02A fit 2) suzuka bounds 0.97-1.03
+    p_k_max_kw: 350.0 # PLACEHOLDER: calibrate (Rule Set nominal)
+    battery_discharge_efficiency: 0.95 # PLACEHOLDER: calibrate
+    brake_harvest_share: 0.50 # PLACEHOLDER: calibrate
+    partial_harvest_max_kw: 100.0 # PLACEHOLDER: calibrate
+    ice_efficiency: 0.50 # PLACEHOLDER: calibrate
+    fuel_energy_density_mj_per_kg: 43.0 # PLACEHOLDER: calibrate
+    driveline_efficiency: 0.95 # PLACEHOLDER: calibrate
+    cda_straight: 0.8717 # CALIBRATED-PROVISIONAL (T-02A fit 2) suzuka bounds 0.4-1
+    cda_corner: 1.5744 # CALIBRATED-PROVISIONAL (T-02A fit 2) suzuka bounds 0.7-1.6
+    cla_straight: 2.00 # PLACEHOLDER: calibrate
+    cla_corner: 4.9033 # CALIBRATED-PROVISIONAL (T-02A fit 2) suzuka bounds 2.5-6
+    long_grip_ratio: 0.8002 # CALIBRATED-PROVISIONAL (T-02A fit 2) suzuka bounds 0.8-1.2; shared
+    reliability_dnf_p_per_race: 0.05 # PLACEHOLDER: calibrate
+    aggression: 0.50 # PLACEHOLDER: calibrate
+    strategy_style: BALANCED # PLACEHOLDER: calibrate
+  audi: # Audi (real_2026)
+    p_ice_max_kw: 400.0 # PLACEHOLDER: calibrate (Rule Set nominal)
+    pu_power_scale: 1.0242 # CALIBRATED-PROVISIONAL (T-02A fit 2) suzuka bounds 0.97-1.03
+    p_k_max_kw: 350.0 # PLACEHOLDER: calibrate (Rule Set nominal)
+    battery_discharge_efficiency: 0.95 # PLACEHOLDER: calibrate
+    brake_harvest_share: 0.50 # PLACEHOLDER: calibrate
+    partial_harvest_max_kw: 100.0 # PLACEHOLDER: calibrate
+    ice_efficiency: 0.50 # PLACEHOLDER: calibrate
+    fuel_energy_density_mj_per_kg: 43.0 # PLACEHOLDER: calibrate
+    driveline_efficiency: 0.95 # PLACEHOLDER: calibrate
+    cda_straight: 0.7593 # CALIBRATED-PROVISIONAL (T-02A fit 2) suzuka bounds 0.4-1
+    cda_corner: 1.5859 # CALIBRATED-PROVISIONAL (T-02A fit 2) suzuka bounds 0.7-1.6
+    cla_straight: 2.00 # PLACEHOLDER: calibrate
+    cla_corner: 4.8027 # CALIBRATED-PROVISIONAL (T-02A fit 2) suzuka bounds 2.5-6
+    long_grip_ratio: 0.8002 # CALIBRATED-PROVISIONAL (T-02A fit 2) suzuka bounds 0.8-1.2; shared
+    reliability_dnf_p_per_race: 0.05 # PLACEHOLDER: calibrate
+    aggression: 0.50 # PLACEHOLDER: calibrate
+    strategy_style: BALANCED # PLACEHOLDER: calibrate
+  alpine: # Alpine F1 Team (real_2026)
+    p_ice_max_kw: 400.0 # PLACEHOLDER: calibrate (Rule Set nominal)
+    pu_power_scale: 1.0296 # CALIBRATED-PROVISIONAL (T-02A fit 2) suzuka bounds 0.97-1.03
+    p_k_max_kw: 350.0 # PLACEHOLDER: calibrate (Rule Set nominal)
+    battery_discharge_efficiency: 0.95 # PLACEHOLDER: calibrate
+    brake_harvest_share: 0.50 # PLACEHOLDER: calibrate
+    partial_harvest_max_kw: 100.0 # PLACEHOLDER: calibrate
+    ice_efficiency: 0.50 # PLACEHOLDER: calibrate
+    fuel_energy_density_mj_per_kg: 43.0 # PLACEHOLDER: calibrate
+    driveline_efficiency: 0.95 # PLACEHOLDER: calibrate
+    cda_straight: 0.8557 # CALIBRATED-PROVISIONAL (T-02A fit 2) suzuka bounds 0.4-1
+    cda_corner: 1.4986 # CALIBRATED-PROVISIONAL (T-02A fit 2) suzuka bounds 0.7-1.6
+    cla_straight: 2.00 # PLACEHOLDER: calibrate
+    cla_corner: 4.8946 # CALIBRATED-PROVISIONAL (T-02A fit 2) suzuka bounds 2.5-6
+    long_grip_ratio: 0.8002 # CALIBRATED-PROVISIONAL (T-02A fit 2) suzuka bounds 0.8-1.2; shared
+    reliability_dnf_p_per_race: 0.05 # PLACEHOLDER: calibrate
+    aggression: 0.50 # PLACEHOLDER: calibrate
+    strategy_style: BALANCED # PLACEHOLDER: calibrate
+  haas: # Haas F1 Team (real_2026)
+    p_ice_max_kw: 400.0 # PLACEHOLDER: calibrate (Rule Set nominal)
+    pu_power_scale: 1.0030 # CALIBRATED-PROVISIONAL (T-02A fit 2) suzuka bounds 0.97-1.03
+    p_k_max_kw: 350.0 # PLACEHOLDER: calibrate (Rule Set nominal)
+    battery_discharge_efficiency: 0.95 # PLACEHOLDER: calibrate
+    brake_harvest_share: 0.50 # PLACEHOLDER: calibrate
+    partial_harvest_max_kw: 100.0 # PLACEHOLDER: calibrate
+    ice_efficiency: 0.50 # PLACEHOLDER: calibrate
+    fuel_energy_density_mj_per_kg: 43.0 # PLACEHOLDER: calibrate
+    driveline_efficiency: 0.95 # PLACEHOLDER: calibrate
+    cda_straight: 0.5431 # CALIBRATED-PROVISIONAL (T-02A fit 2) suzuka bounds 0.4-1
+    cda_corner: 1.5998 # CALIBRATED-PROVISIONAL (T-02A fit 2) suzuka bounds 0.7-1.6
+    cla_straight: 2.00 # PLACEHOLDER: calibrate
+    cla_corner: 4.7501 # CALIBRATED-PROVISIONAL (T-02A fit 2) suzuka bounds 2.5-6
+    long_grip_ratio: 0.8002 # CALIBRATED-PROVISIONAL (T-02A fit 2) suzuka bounds 0.8-1.2; shared
+    reliability_dnf_p_per_race: 0.05 # PLACEHOLDER: calibrate
+    aggression: 0.50 # PLACEHOLDER: calibrate
+    strategy_style: BALANCED # PLACEHOLDER: calibrate
+  williams: # Williams (real_2026)
+    p_ice_max_kw: 400.0 # PLACEHOLDER: calibrate (Rule Set nominal)
+    pu_power_scale: 0.9784 # CALIBRATED-PROVISIONAL (T-02A fit 2) suzuka bounds 0.97-1.03
+    p_k_max_kw: 350.0 # PLACEHOLDER: calibrate (Rule Set nominal)
+    battery_discharge_efficiency: 0.95 # PLACEHOLDER: calibrate
+    brake_harvest_share: 0.50 # PLACEHOLDER: calibrate
+    partial_harvest_max_kw: 100.0 # PLACEHOLDER: calibrate
+    ice_efficiency: 0.50 # PLACEHOLDER: calibrate
+    fuel_energy_density_mj_per_kg: 43.0 # PLACEHOLDER: calibrate
+    driveline_efficiency: 0.95 # PLACEHOLDER: calibrate
+    cda_straight: 0.5459 # CALIBRATED-PROVISIONAL (T-02A fit 2) suzuka bounds 0.4-1
+    cda_corner: 1.5513 # CALIBRATED-PROVISIONAL (T-02A fit 2) suzuka bounds 0.7-1.6
+    cla_straight: 2.00 # PLACEHOLDER: calibrate
+    cla_corner: 4.4611 # CALIBRATED-PROVISIONAL (T-02A fit 2) suzuka bounds 2.5-6
+    long_grip_ratio: 0.8002 # CALIBRATED-PROVISIONAL (T-02A fit 2) suzuka bounds 0.8-1.2; shared
+    reliability_dnf_p_per_race: 0.05 # PLACEHOLDER: calibrate
+    aggression: 0.50 # PLACEHOLDER: calibrate
+    strategy_style: BALANCED # PLACEHOLDER: calibrate
+  aston_martin: # Aston Martin (real_2026)
+    p_ice_max_kw: 400.0 # PLACEHOLDER: calibrate (Rule Set nominal)
+    pu_power_scale: 1.0190 # CALIBRATED-PROVISIONAL (T-02A fit 2) suzuka bounds 0.97-1.03
+    p_k_max_kw: 350.0 # PLACEHOLDER: calibrate (Rule Set nominal)
+    battery_discharge_efficiency: 0.95 # PLACEHOLDER: calibrate
+    brake_harvest_share: 0.50 # PLACEHOLDER: calibrate
+    partial_harvest_max_kw: 100.0 # PLACEHOLDER: calibrate
+    ice_efficiency: 0.50 # PLACEHOLDER: calibrate
+    fuel_energy_density_mj_per_kg: 43.0 # PLACEHOLDER: calibrate
+    driveline_efficiency: 0.95 # PLACEHOLDER: calibrate
+    cda_straight: 0.7956 # CALIBRATED-PROVISIONAL (T-02A fit 2) suzuka bounds 0.4-1
+    cda_corner: 1.5992 # CALIBRATED-PROVISIONAL (T-02A fit 2) suzuka bounds 0.7-1.6
+    cla_straight: 2.00 # PLACEHOLDER: calibrate
+    cla_corner: 4.2118 # CALIBRATED-PROVISIONAL (T-02A fit 2) suzuka bounds 2.5-6
+    long_grip_ratio: 0.8002 # CALIBRATED-PROVISIONAL (T-02A fit 2) suzuka bounds 0.8-1.2; shared
+    reliability_dnf_p_per_race: 0.05 # PLACEHOLDER: calibrate
+    aggression: 0.50 # PLACEHOLDER: calibrate
+    strategy_style: BALANCED # PLACEHOLDER: calibrate
+  cadillac: # Cadillac F1 Team (real_2026)
+    p_ice_max_kw: 400.0 # PLACEHOLDER: calibrate (Rule Set nominal)
+    pu_power_scale: 1.0113 # CALIBRATED-PROVISIONAL (T-02A fit 2) suzuka bounds 0.97-1.03
+    p_k_max_kw: 350.0 # PLACEHOLDER: calibrate (Rule Set nominal)
+    battery_discharge_efficiency: 0.95 # PLACEHOLDER: calibrate
+    brake_harvest_share: 0.50 # PLACEHOLDER: calibrate
+    partial_harvest_max_kw: 100.0 # PLACEHOLDER: calibrate
+    ice_efficiency: 0.50 # PLACEHOLDER: calibrate
+    fuel_energy_density_mj_per_kg: 43.0 # PLACEHOLDER: calibrate
+    driveline_efficiency: 0.95 # PLACEHOLDER: calibrate
+    cda_straight: 0.6785 # CALIBRATED-PROVISIONAL (T-02A fit 2) suzuka bounds 0.4-1
+    cda_corner: 1.5956 # CALIBRATED-PROVISIONAL (T-02A fit 2) suzuka bounds 0.7-1.6
+    cla_straight: 2.00 # PLACEHOLDER: calibrate
+    cla_corner: 4.2136 # CALIBRATED-PROVISIONAL (T-02A fit 2) suzuka bounds 2.5-6
+    long_grip_ratio: 0.8002 # CALIBRATED-PROVISIONAL (T-02A fit 2) suzuka bounds 0.8-1.2; shared
+    reliability_dnf_p_per_race: 0.05 # PLACEHOLDER: calibrate
+    aggression: 0.50 # PLACEHOLDER: calibrate
+    strategy_style: BALANCED # PLACEHOLDER: calibrate
+  aurora: # Aurora Racing (fictional)
+    p_ice_max_kw: 400.0 # PLACEHOLDER: calibrate (Rule Set nominal)
+    pu_power_scale: 1.0000 # CALIBRATED-PROVISIONAL (T-02A fit 2) suzuka bounds 0.97-1.03; stage-1 shared, neutral team
+    p_k_max_kw: 350.0 # PLACEHOLDER: calibrate (Rule Set nominal)
+    battery_discharge_efficiency: 0.95 # PLACEHOLDER: calibrate
+    brake_harvest_share: 0.50 # PLACEHOLDER: calibrate
+    partial_harvest_max_kw: 100.0 # PLACEHOLDER: calibrate
+    ice_efficiency: 0.50 # PLACEHOLDER: calibrate
+    fuel_energy_density_mj_per_kg: 43.0 # PLACEHOLDER: calibrate
+    driveline_efficiency: 0.95 # PLACEHOLDER: calibrate
+    cda_straight: 0.8964 # CALIBRATED-PROVISIONAL (T-02A fit 2) suzuka bounds 0.4-1; stage-1 shared, neutral team
+    cda_corner: 1.3100 # CALIBRATED-PROVISIONAL (T-02A fit 2) suzuka bounds 0.7-1.6; stage-1 shared, neutral team
+    cla_straight: 2.00 # PLACEHOLDER: calibrate
+    cla_corner: 4.8175 # CALIBRATED-PROVISIONAL (T-02A fit 2) suzuka bounds 2.5-6; stage-1 shared, neutral team
+    long_grip_ratio: 0.8002 # CALIBRATED-PROVISIONAL (T-02A fit 2) suzuka bounds 0.8-1.2; shared
+    reliability_dnf_p_per_race: 0.05 # PLACEHOLDER: calibrate
+    aggression: 0.50 # PLACEHOLDER: calibrate
+    strategy_style: BALANCED # PLACEHOLDER: calibrate
+  brontes: # Brontes Grand Prix (fictional)
+    p_ice_max_kw: 400.0 # PLACEHOLDER: calibrate (Rule Set nominal)
+    pu_power_scale: 1.0000 # CALIBRATED-PROVISIONAL (T-02A fit 2) suzuka bounds 0.97-1.03; stage-1 shared, neutral team
+    p_k_max_kw: 350.0 # PLACEHOLDER: calibrate (Rule Set nominal)
+    battery_discharge_efficiency: 0.95 # PLACEHOLDER: calibrate
+    brake_harvest_share: 0.50 # PLACEHOLDER: calibrate
+    partial_harvest_max_kw: 100.0 # PLACEHOLDER: calibrate
+    ice_efficiency: 0.50 # PLACEHOLDER: calibrate
+    fuel_energy_density_mj_per_kg: 43.0 # PLACEHOLDER: calibrate
+    driveline_efficiency: 0.95 # PLACEHOLDER: calibrate
+    cda_straight: 0.8964 # CALIBRATED-PROVISIONAL (T-02A fit 2) suzuka bounds 0.4-1; stage-1 shared, neutral team
+    cda_corner: 1.3100 # CALIBRATED-PROVISIONAL (T-02A fit 2) suzuka bounds 0.7-1.6; stage-1 shared, neutral team
+    cla_straight: 2.00 # PLACEHOLDER: calibrate
+    cla_corner: 4.8175 # CALIBRATED-PROVISIONAL (T-02A fit 2) suzuka bounds 2.5-6; stage-1 shared, neutral team
+    long_grip_ratio: 0.8002 # CALIBRATED-PROVISIONAL (T-02A fit 2) suzuka bounds 0.8-1.2; shared
+    reliability_dnf_p_per_race: 0.05 # PLACEHOLDER: calibrate
+    aggression: 0.50 # PLACEHOLDER: calibrate
+    strategy_style: BALANCED # PLACEHOLDER: calibrate
+  calder: # Calder Works (fictional)
+    p_ice_max_kw: 400.0 # PLACEHOLDER: calibrate (Rule Set nominal)
+    pu_power_scale: 1.0000 # CALIBRATED-PROVISIONAL (T-02A fit 2) suzuka bounds 0.97-1.03; stage-1 shared, neutral team
+    p_k_max_kw: 350.0 # PLACEHOLDER: calibrate (Rule Set nominal)
+    battery_discharge_efficiency: 0.95 # PLACEHOLDER: calibrate
+    brake_harvest_share: 0.50 # PLACEHOLDER: calibrate
+    partial_harvest_max_kw: 100.0 # PLACEHOLDER: calibrate
+    ice_efficiency: 0.50 # PLACEHOLDER: calibrate
+    fuel_energy_density_mj_per_kg: 43.0 # PLACEHOLDER: calibrate
+    driveline_efficiency: 0.95 # PLACEHOLDER: calibrate
+    cda_straight: 0.8964 # CALIBRATED-PROVISIONAL (T-02A fit 2) suzuka bounds 0.4-1; stage-1 shared, neutral team
+    cda_corner: 1.3100 # CALIBRATED-PROVISIONAL (T-02A fit 2) suzuka bounds 0.7-1.6; stage-1 shared, neutral team
+    cla_straight: 2.00 # PLACEHOLDER: calibrate
+    cla_corner: 4.8175 # CALIBRATED-PROVISIONAL (T-02A fit 2) suzuka bounds 2.5-6; stage-1 shared, neutral team
+    long_grip_ratio: 0.8002 # CALIBRATED-PROVISIONAL (T-02A fit 2) suzuka bounds 0.8-1.2; shared
+    reliability_dnf_p_per_race: 0.05 # PLACEHOLDER: calibrate
+    aggression: 0.50 # PLACEHOLDER: calibrate
+    strategy_style: BALANCED # PLACEHOLDER: calibrate
+  driftwood: # Driftwood Motorsport (fictional)
+    p_ice_max_kw: 400.0 # PLACEHOLDER: calibrate (Rule Set nominal)
+    pu_power_scale: 1.0000 # CALIBRATED-PROVISIONAL (T-02A fit 2) suzuka bounds 0.97-1.03; stage-1 shared, neutral team
+    p_k_max_kw: 350.0 # PLACEHOLDER: calibrate (Rule Set nominal)
+    battery_discharge_efficiency: 0.95 # PLACEHOLDER: calibrate
+    brake_harvest_share: 0.50 # PLACEHOLDER: calibrate
+    partial_harvest_max_kw: 100.0 # PLACEHOLDER: calibrate
+    ice_efficiency: 0.50 # PLACEHOLDER: calibrate
+    fuel_energy_density_mj_per_kg: 43.0 # PLACEHOLDER: calibrate
+    driveline_efficiency: 0.95 # PLACEHOLDER: calibrate
+    cda_straight: 0.8964 # CALIBRATED-PROVISIONAL (T-02A fit 2) suzuka bounds 0.4-1; stage-1 shared, neutral team
+    cda_corner: 1.3100 # CALIBRATED-PROVISIONAL (T-02A fit 2) suzuka bounds 0.7-1.6; stage-1 shared, neutral team
+    cla_straight: 2.00 # PLACEHOLDER: calibrate
+    cla_corner: 4.8175 # CALIBRATED-PROVISIONAL (T-02A fit 2) suzuka bounds 2.5-6; stage-1 shared, neutral team
+    long_grip_ratio: 0.8002 # CALIBRATED-PROVISIONAL (T-02A fit 2) suzuka bounds 0.8-1.2; shared
+    reliability_dnf_p_per_race: 0.05 # PLACEHOLDER: calibrate
+    aggression: 0.50 # PLACEHOLDER: calibrate
+    strategy_style: BALANCED # PLACEHOLDER: calibrate
+  equinox: # Equinox Racing Team (fictional)
+    p_ice_max_kw: 400.0 # PLACEHOLDER: calibrate (Rule Set nominal)
+    pu_power_scale: 1.0000 # CALIBRATED-PROVISIONAL (T-02A fit 2) suzuka bounds 0.97-1.03; stage-1 shared, neutral team
+    p_k_max_kw: 350.0 # PLACEHOLDER: calibrate (Rule Set nominal)
+    battery_discharge_efficiency: 0.95 # PLACEHOLDER: calibrate
+    brake_harvest_share: 0.50 # PLACEHOLDER: calibrate
+    partial_harvest_max_kw: 100.0 # PLACEHOLDER: calibrate
+    ice_efficiency: 0.50 # PLACEHOLDER: calibrate
+    fuel_energy_density_mj_per_kg: 43.0 # PLACEHOLDER: calibrate
+    driveline_efficiency: 0.95 # PLACEHOLDER: calibrate
+    cda_straight: 0.8964 # CALIBRATED-PROVISIONAL (T-02A fit 2) suzuka bounds 0.4-1; stage-1 shared, neutral team
+    cda_corner: 1.3100 # CALIBRATED-PROVISIONAL (T-02A fit 2) suzuka bounds 0.7-1.6; stage-1 shared, neutral team
+    cla_straight: 2.00 # PLACEHOLDER: calibrate
+    cla_corner: 4.8175 # CALIBRATED-PROVISIONAL (T-02A fit 2) suzuka bounds 2.5-6; stage-1 shared, neutral team
+    long_grip_ratio: 0.8002 # CALIBRATED-PROVISIONAL (T-02A fit 2) suzuka bounds 0.8-1.2; shared
+    reliability_dnf_p_per_race: 0.05 # PLACEHOLDER: calibrate
+    aggression: 0.50 # PLACEHOLDER: calibrate
+    strategy_style: BALANCED # PLACEHOLDER: calibrate
+  fulcrum: # Fulcrum F1 (fictional)
+    p_ice_max_kw: 400.0 # PLACEHOLDER: calibrate (Rule Set nominal)
+    pu_power_scale: 1.0000 # CALIBRATED-PROVISIONAL (T-02A fit 2) suzuka bounds 0.97-1.03; stage-1 shared, neutral team
+    p_k_max_kw: 350.0 # PLACEHOLDER: calibrate (Rule Set nominal)
+    battery_discharge_efficiency: 0.95 # PLACEHOLDER: calibrate
+    brake_harvest_share: 0.50 # PLACEHOLDER: calibrate
+    partial_harvest_max_kw: 100.0 # PLACEHOLDER: calibrate
+    ice_efficiency: 0.50 # PLACEHOLDER: calibrate
+    fuel_energy_density_mj_per_kg: 43.0 # PLACEHOLDER: calibrate
+    driveline_efficiency: 0.95 # PLACEHOLDER: calibrate
+    cda_straight: 0.8964 # CALIBRATED-PROVISIONAL (T-02A fit 2) suzuka bounds 0.4-1; stage-1 shared, neutral team
+    cda_corner: 1.3100 # CALIBRATED-PROVISIONAL (T-02A fit 2) suzuka bounds 0.7-1.6; stage-1 shared, neutral team
+    cla_straight: 2.00 # PLACEHOLDER: calibrate
+    cla_corner: 4.8175 # CALIBRATED-PROVISIONAL (T-02A fit 2) suzuka bounds 2.5-6; stage-1 shared, neutral team
+    long_grip_ratio: 0.8002 # CALIBRATED-PROVISIONAL (T-02A fit 2) suzuka bounds 0.8-1.2; shared
+    reliability_dnf_p_per_race: 0.05 # PLACEHOLDER: calibrate
+    aggression: 0.50 # PLACEHOLDER: calibrate
+    strategy_style: BALANCED # PLACEHOLDER: calibrate
+  greystone: # Greystone Racing (fictional)
+    p_ice_max_kw: 400.0 # PLACEHOLDER: calibrate (Rule Set nominal)
+    pu_power_scale: 1.0000 # CALIBRATED-PROVISIONAL (T-02A fit 2) suzuka bounds 0.97-1.03; stage-1 shared, neutral team
+    p_k_max_kw: 350.0 # PLACEHOLDER: calibrate (Rule Set nominal)
+    battery_discharge_efficiency: 0.95 # PLACEHOLDER: calibrate
+    brake_harvest_share: 0.50 # PLACEHOLDER: calibrate
+    partial_harvest_max_kw: 100.0 # PLACEHOLDER: calibrate
+    ice_efficiency: 0.50 # PLACEHOLDER: calibrate
+    fuel_energy_density_mj_per_kg: 43.0 # PLACEHOLDER: calibrate
+    driveline_efficiency: 0.95 # PLACEHOLDER: calibrate
+    cda_straight: 0.8964 # CALIBRATED-PROVISIONAL (T-02A fit 2) suzuka bounds 0.4-1; stage-1 shared, neutral team
+    cda_corner: 1.3100 # CALIBRATED-PROVISIONAL (T-02A fit 2) suzuka bounds 0.7-1.6; stage-1 shared, neutral team
+    cla_straight: 2.00 # PLACEHOLDER: calibrate
+    cla_corner: 4.8175 # CALIBRATED-PROVISIONAL (T-02A fit 2) suzuka bounds 2.5-6; stage-1 shared, neutral team
+    long_grip_ratio: 0.8002 # CALIBRATED-PROVISIONAL (T-02A fit 2) suzuka bounds 0.8-1.2; shared
+    reliability_dnf_p_per_race: 0.05 # PLACEHOLDER: calibrate
+    aggression: 0.50 # PLACEHOLDER: calibrate
+    strategy_style: BALANCED # PLACEHOLDER: calibrate
+  halcyon: # Halcyon Autosport (fictional)
+    p_ice_max_kw: 400.0 # PLACEHOLDER: calibrate (Rule Set nominal)
+    pu_power_scale: 1.0000 # CALIBRATED-PROVISIONAL (T-02A fit 2) suzuka bounds 0.97-1.03; stage-1 shared, neutral team
+    p_k_max_kw: 350.0 # PLACEHOLDER: calibrate (Rule Set nominal)
+    battery_discharge_efficiency: 0.95 # PLACEHOLDER: calibrate
+    brake_harvest_share: 0.50 # PLACEHOLDER: calibrate
+    partial_harvest_max_kw: 100.0 # PLACEHOLDER: calibrate
+    ice_efficiency: 0.50 # PLACEHOLDER: calibrate
+    fuel_energy_density_mj_per_kg: 43.0 # PLACEHOLDER: calibrate
+    driveline_efficiency: 0.95 # PLACEHOLDER: calibrate
+    cda_straight: 0.8964 # CALIBRATED-PROVISIONAL (T-02A fit 2) suzuka bounds 0.4-1; stage-1 shared, neutral team
+    cda_corner: 1.3100 # CALIBRATED-PROVISIONAL (T-02A fit 2) suzuka bounds 0.7-1.6; stage-1 shared, neutral team
+    cla_straight: 2.00 # PLACEHOLDER: calibrate
+    cla_corner: 4.8175 # CALIBRATED-PROVISIONAL (T-02A fit 2) suzuka bounds 2.5-6; stage-1 shared, neutral team
+    long_grip_ratio: 0.8002 # CALIBRATED-PROVISIONAL (T-02A fit 2) suzuka bounds 0.8-1.2; shared
+    reliability_dnf_p_per_race: 0.05 # PLACEHOLDER: calibrate
+    aggression: 0.50 # PLACEHOLDER: calibrate
+    strategy_style: BALANCED # PLACEHOLDER: calibrate
+  ironwood: # Ironwood Competition (fictional)
+    p_ice_max_kw: 400.0 # PLACEHOLDER: calibrate (Rule Set nominal)
+    pu_power_scale: 1.0000 # CALIBRATED-PROVISIONAL (T-02A fit 2) suzuka bounds 0.97-1.03; stage-1 shared, neutral team
+    p_k_max_kw: 350.0 # PLACEHOLDER: calibrate (Rule Set nominal)
+    battery_discharge_efficiency: 0.95 # PLACEHOLDER: calibrate
+    brake_harvest_share: 0.50 # PLACEHOLDER: calibrate
+    partial_harvest_max_kw: 100.0 # PLACEHOLDER: calibrate
+    ice_efficiency: 0.50 # PLACEHOLDER: calibrate
+    fuel_energy_density_mj_per_kg: 43.0 # PLACEHOLDER: calibrate
+    driveline_efficiency: 0.95 # PLACEHOLDER: calibrate
+    cda_straight: 0.8964 # CALIBRATED-PROVISIONAL (T-02A fit 2) suzuka bounds 0.4-1; stage-1 shared, neutral team
+    cda_corner: 1.3100 # CALIBRATED-PROVISIONAL (T-02A fit 2) suzuka bounds 0.7-1.6; stage-1 shared, neutral team
+    cla_straight: 2.00 # PLACEHOLDER: calibrate
+    cla_corner: 4.8175 # CALIBRATED-PROVISIONAL (T-02A fit 2) suzuka bounds 2.5-6; stage-1 shared, neutral team
+    long_grip_ratio: 0.8002 # CALIBRATED-PROVISIONAL (T-02A fit 2) suzuka bounds 0.8-1.2; shared
+    reliability_dnf_p_per_race: 0.05 # PLACEHOLDER: calibrate
+    aggression: 0.50 # PLACEHOLDER: calibrate
+    strategy_style: BALANCED # PLACEHOLDER: calibrate
+  juniper: # Juniper Racing (fictional)
+    p_ice_max_kw: 400.0 # PLACEHOLDER: calibrate (Rule Set nominal)
+    pu_power_scale: 1.0000 # CALIBRATED-PROVISIONAL (T-02A fit 2) suzuka bounds 0.97-1.03; stage-1 shared, neutral team
+    p_k_max_kw: 350.0 # PLACEHOLDER: calibrate (Rule Set nominal)
+    battery_discharge_efficiency: 0.95 # PLACEHOLDER: calibrate
+    brake_harvest_share: 0.50 # PLACEHOLDER: calibrate
+    partial_harvest_max_kw: 100.0 # PLACEHOLDER: calibrate
+    ice_efficiency: 0.50 # PLACEHOLDER: calibrate
+    fuel_energy_density_mj_per_kg: 43.0 # PLACEHOLDER: calibrate
+    driveline_efficiency: 0.95 # PLACEHOLDER: calibrate
+    cda_straight: 0.8964 # CALIBRATED-PROVISIONAL (T-02A fit 2) suzuka bounds 0.4-1; stage-1 shared, neutral team
+    cda_corner: 1.3100 # CALIBRATED-PROVISIONAL (T-02A fit 2) suzuka bounds 0.7-1.6; stage-1 shared, neutral team
+    cla_straight: 2.00 # PLACEHOLDER: calibrate
+    cla_corner: 4.8175 # CALIBRATED-PROVISIONAL (T-02A fit 2) suzuka bounds 2.5-6; stage-1 shared, neutral team
+    long_grip_ratio: 0.8002 # CALIBRATED-PROVISIONAL (T-02A fit 2) suzuka bounds 0.8-1.2; shared
+    reliability_dnf_p_per_race: 0.05 # PLACEHOLDER: calibrate
+    aggression: 0.50 # PLACEHOLDER: calibrate
+    strategy_style: BALANCED # PLACEHOLDER: calibrate
+  kestrel: # Kestrel Grand Prix (fictional)
+    p_ice_max_kw: 400.0 # PLACEHOLDER: calibrate (Rule Set nominal)
+    pu_power_scale: 1.0000 # CALIBRATED-PROVISIONAL (T-02A fit 2) suzuka bounds 0.97-1.03; stage-1 shared, neutral team
+    p_k_max_kw: 350.0 # PLACEHOLDER: calibrate (Rule Set nominal)
+    battery_discharge_efficiency: 0.95 # PLACEHOLDER: calibrate
+    brake_harvest_share: 0.50 # PLACEHOLDER: calibrate
+    partial_harvest_max_kw: 100.0 # PLACEHOLDER: calibrate
+    ice_efficiency: 0.50 # PLACEHOLDER: calibrate
+    fuel_energy_density_mj_per_kg: 43.0 # PLACEHOLDER: calibrate
+    driveline_efficiency: 0.95 # PLACEHOLDER: calibrate
+    cda_straight: 0.8964 # CALIBRATED-PROVISIONAL (T-02A fit 2) suzuka bounds 0.4-1; stage-1 shared, neutral team
+    cda_corner: 1.3100 # CALIBRATED-PROVISIONAL (T-02A fit 2) suzuka bounds 0.7-1.6; stage-1 shared, neutral team
+    cla_straight: 2.00 # PLACEHOLDER: calibrate
+    cla_corner: 4.8175 # CALIBRATED-PROVISIONAL (T-02A fit 2) suzuka bounds 2.5-6; stage-1 shared, neutral team
+    long_grip_ratio: 0.8002 # CALIBRATED-PROVISIONAL (T-02A fit 2) suzuka bounds 0.8-1.2; shared
+    reliability_dnf_p_per_race: 0.05 # PLACEHOLDER: calibrate
+    aggression: 0.50 # PLACEHOLDER: calibrate
+    strategy_style: BALANCED # PLACEHOLDER: calibrate

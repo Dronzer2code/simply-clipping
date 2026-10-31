@@ -1,0 +1,225 @@
+# F19 Grid Config: a fully fictional grid, 11 teams x 2 drivers = 22 cars.
+#
+# Every team name, driver name, power unit maker and livery colour here is
+# invented for this project. Nothing in this file refers to a real team, driver
+# or manufacturer. It exists so the simulator can run without real names
+# (PRD CONSTRAINTS: public release with real names is UNRESOLVED licensing).
+#
+# Code references team_id / driver_id only (HR-06), so this file is a drop-in
+# replacement for config/grid/real_2026.yaml.
+#
+# Driver skill ratings are calibration inputs (F20); 0.0 is the neutral value
+# shown in the TRD grid schema. Invented drivers have no real reference, so
+# they stay neutral until the owner chooses a spread.
+
+grid_id: fictional
+teams:
+  - team_id: "aurora"
+    display_name: "Aurora Racing"
+    pu_maker: "Aurora Dynamics"
+    color_hex: "#1B6FD6"
+    drivers:
+      - driver_id: "KVL"
+        code: "KVL"
+        display_name: "Niko Kvalheim"
+        number: 2
+        skill_pace: 0.0 # PLACEHOLDER: calibrate
+        skill_racecraft: 0.0 # PLACEHOLDER: calibrate
+        skill_consistency: 0.0 # PLACEHOLDER: calibrate
+      - driver_id: "REN"
+        code: "REN"
+        display_name: "Theo Renaud"
+        number: 7
+        skill_pace: 0.0 # PLACEHOLDER: calibrate
+        skill_racecraft: 0.0 # PLACEHOLDER: calibrate
+        skill_consistency: 0.0 # PLACEHOLDER: calibrate
+  - team_id: "brontes"
+    display_name: "Brontes Grand Prix"
+    pu_maker: "Brontes Motoren"
+    color_hex: "#C8102E"
+    drivers:
+      - driver_id: "MAE"
+        code: "MAE"
+        display_name: "Dario Maestrelli"
+        number: 4
+        skill_pace: 0.0 # PLACEHOLDER: calibrate
+        skill_racecraft: 0.0 # PLACEHOLDER: calibrate
+        skill_consistency: 0.0 # PLACEHOLDER: calibrate
+      - driver_id: "OKN"
+        code: "OKN"
+        display_name: "Ruben Okonkwo"
+        number: 9
+        skill_pace: 0.0 # PLACEHOLDER: calibrate
+        skill_racecraft: 0.0 # PLACEHOLDER: calibrate
+        skill_consistency: 0.0 # PLACEHOLDER: calibrate
+  - team_id: "calder"
+    display_name: "Calder Works"
+    pu_maker: "Calder Powertrains"
+    color_hex: "#00A19B"
+    drivers:
+      - driver_id: "HSW"
+        code: "HSW"
+        display_name: "Marit Halstrow"
+        number: 13
+        skill_pace: 0.0 # PLACEHOLDER: calibrate
+        skill_racecraft: 0.0 # PLACEHOLDER: calibrate
+        skill_consistency: 0.0 # PLACEHOLDER: calibrate
+      - driver_id: "TAV"
+        code: "TAV"
+        display_name: "Elias Tavares"
+        number: 15
+        skill_pace: 0.0 # PLACEHOLDER: calibrate
+        skill_racecraft: 0.0 # PLACEHOLDER: calibrate
+        skill_consistency: 0.0 # PLACEHOLDER: calibrate
+  - team_id: "driftwood"
+    display_name: "Driftwood Motorsport"
+    pu_maker: "Aurora Dynamics"
+    color_hex: "#F0A202"
+    drivers:
+      - driver_id: "BAN"
+        code: "BAN"
+        display_name: "Yusuf Bandele"
+        number: 17
+        skill_pace: 0.0 # PLACEHOLDER: calibrate
+        skill_racecraft: 0.0 # PLACEHOLDER: calibrate
+        skill_consistency: 0.0 # PLACEHOLDER: calibrate
+      - driver_id: "SVR"
+        code: "SVR"
+        display_name: "Anton Severin"
+        number: 19
+        skill_pace: 0.0 # PLACEHOLDER: calibrate
+        skill_racecraft: 0.0 # PLACEHOLDER: calibrate
+        skill_consistency: 0.0 # PLACEHOLDER: calibrate
+  - team_id: "equinox"
+    display_name: "Equinox Racing Team"
+    pu_maker: "Equinox Energy"
+    color_hex: "#6A3DF0"
+    drivers:
+      - driver_id: "LIA"
+        code: "LIA"
+        display_name: "Sofia Liang"
+        number: 21
+        skill_pace: 0.0 # PLACEHOLDER: calibrate
+        skill_racecraft: 0.0 # PLACEHOLDER: calibrate
+        skill_consistency: 0.0 # PLACEHOLDER: calibrate
+      - driver_id: "DRO"
+        code: "DRO"
+        display_name: "Kaspar Drozd"
+        number: 24
+        skill_pace: 0.0 # PLACEHOLDER: calibrate
+        skill_racecraft: 0.0 # PLACEHOLDER: calibrate
+        skill_consistency: 0.0 # PLACEHOLDER: calibrate
+  - team_id: "fulcrum"
+    display_name: "Fulcrum F1"
+    pu_maker: "Brontes Motoren"
+    color_hex: "#2E8B2E"
+    drivers:
+      - driver_id: "ARV"
+        code: "ARV"
+        display_name: "Lucas Arvelo"
+        number: 26
+        skill_pace: 0.0 # PLACEHOLDER: calibrate
+        skill_racecraft: 0.0 # PLACEHOLDER: calibrate
+        skill_consistency: 0.0 # PLACEHOLDER: calibrate
+      - driver_id: "NKM"
+        code: "NKM"
+        display_name: "Hana Nakamura"
+        number: 28
+        skill_pace: 0.0 # PLACEHOLDER: calibrate
+        skill_racecraft: 0.0 # PLACEHOLDER: calibrate
+        skill_consistency: 0.0 # PLACEHOLDER: calibrate
+  - team_id: "greystone"
+    display_name: "Greystone Racing"
+    pu_maker: "Calder Powertrains"
+    color_hex: "#7A7F86"
+    drivers:
+      - driver_id: "WHT"
+        code: "WHT"
+        display_name: "Callum Whitlock"
+        number: 32
+        skill_pace: 0.0 # PLACEHOLDER: calibrate
+        skill_racecraft: 0.0 # PLACEHOLDER: calibrate
+        skill_consistency: 0.0 # PLACEHOLDER: calibrate
+      - driver_id: "ZAM"
+        code: "ZAM"
+        display_name: "Inez Zamora"
+        number: 34
+        skill_pace: 0.0 # PLACEHOLDER: calibrate
+        skill_racecraft: 0.0 # PLACEHOLDER: calibrate
+        skill_consistency: 0.0 # PLACEHOLDER: calibrate
+  - team_id: "halcyon"
+    display_name: "Halcyon Autosport"
+    pu_maker: "Equinox Energy"
+    color_hex: "#E0609B"
+    drivers:
+      - driver_id: "FEN"
+        code: "FEN"
+        display_name: "Mira Fenwick"
+        number: 36
+        skill_pace: 0.0 # PLACEHOLDER: calibrate
+        skill_racecraft: 0.0 # PLACEHOLDER: calibrate
+        skill_consistency: 0.0 # PLACEHOLDER: calibrate
+      - driver_id: "OSE"
+        code: "OSE"
+        display_name: "Tobias Osei"
+        number: 38
+        skill_pace: 0.0 # PLACEHOLDER: calibrate
+        skill_racecraft: 0.0 # PLACEHOLDER: calibrate
+        skill_consistency: 0.0 # PLACEHOLDER: calibrate
+  - team_id: "ironwood"
+    display_name: "Ironwood Competition"
+    pu_maker: "Aurora Dynamics"
+    color_hex: "#8C5A2B"
+    drivers:
+      - driver_id: "KOR"
+        code: "KOR"
+        display_name: "Vihaan Korde"
+        number: 42
+        skill_pace: 0.0 # PLACEHOLDER: calibrate
+        skill_racecraft: 0.0 # PLACEHOLDER: calibrate
+        skill_consistency: 0.0 # PLACEHOLDER: calibrate
+      - driver_id: "BLM"
+        code: "BLM"
+        display_name: "Freya Blomqvist"
+        number: 45
+        skill_pace: 0.0 # PLACEHOLDER: calibrate
+        skill_racecraft: 0.0 # PLACEHOLDER: calibrate
+        skill_consistency: 0.0 # PLACEHOLDER: calibrate
+  - team_id: "juniper"
+    display_name: "Juniper Racing"
+    pu_maker: "Brontes Motoren"
+    color_hex: "#9BD60C"
+    drivers:
+      - driver_id: "ESP"
+        code: "ESP"
+        display_name: "Mateo Esposito"
+        number: 47
+        skill_pace: 0.0 # PLACEHOLDER: calibrate
+        skill_racecraft: 0.0 # PLACEHOLDER: calibrate
+        skill_consistency: 0.0 # PLACEHOLDER: calibrate
+      - driver_id: "HRD"
+        code: "HRD"
+        display_name: "Sindre Haraldsen"
+        number: 49
+        skill_pace: 0.0 # PLACEHOLDER: calibrate
+        skill_racecraft: 0.0 # PLACEHOLDER: calibrate
+        skill_consistency: 0.0 # PLACEHOLDER: calibrate
+  - team_id: "kestrel"
+    display_name: "Kestrel Grand Prix"
+    pu_maker: "Calder Powertrains"
+    color_hex: "#0D1B33"
+    drivers:
+      - driver_id: "MRO"
+        code: "MRO"
+        display_name: "Adanna Maduro"
+        number: 51
+        skill_pace: 0.0 # PLACEHOLDER: calibrate
+        skill_racecraft: 0.0 # PLACEHOLDER: calibrate
+        skill_consistency: 0.0 # PLACEHOLDER: calibrate
+      - driver_id: "VSK"
+        code: "VSK"
+        display_name: "Pavel Vasko"
+        number: 53
+        skill_pace: 0.0 # PLACEHOLDER: calibrate
+        skill_racecraft: 0.0 # PLACEHOLDER: calibrate
+        skill_consistency: 0.0 # PLACEHOLDER: calibrate

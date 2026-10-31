@@ -1,0 +1,403 @@
+# Application defaults. Every value is either stated in docs/spec/TRD.md or marked
+# below as UNRESOLVED / UNKNOWN / PLACEHOLDER (HR-09). Sources are noted inline.
+
+paths:
+  fastf1_cache: data/fastf1_cache # SETUP.md section 4; enable_cache() must point here
+  openf1_cache: data/openf1_cache # raw OpenF1 responses, so rebuilds run offline
+  multiviewer_cache: data/multiviewer_cache # raw MultiViewer circuit documents (T-011)
+  tracks: data/tracks # F01 built track models
+  real_races: data/real_races # F17, F18, F20
+  calibration: data/calibration # F20 reports
+  runs: data/runs # headless Ground Truth logs
+  cost_cache: data/cost_cache # hackathon H1: decision costs by snapshot (a rehearsal of the demo race fills it)
+
+sim:
+  dt_s: 0.05 # TRD Time stepping: 20 Hz fixed physics step
+  decision_tick_s: 1.0 # TRD Time stepping: strategy / AI decision tick
+  default_seed: 42 # CLAUDE.md CODE CONVENTIONS and SETUP.md examples use seed 42
+
+feed:
+  # TRD PUBLIC FEED defaults (structural decision, mirrors FastF1 characteristics).
+  rate_hz: 4
+  drop_p: 0.05
+  speed_noise_kmh: 0.5
+  throttle_noise_pct: 1.0
+  position_noise_m: 1.0
+  window_s: 120.0 # STRUCTURAL (T-050): feed frames kept for EngineerView / Radar
+  # STRUCTURAL (T-050): gears are not simulated; the feed's gear is the band of
+  # these upshift speeds (km/h) the car's speed falls in (8 gears).
+  gear_upshift_kmh: [85, 120, 155, 190, 225, 260, 295]
+
+ui:
+  window_title: "We Are Racing, Not Testing" # product name (owner decision 2026-10-19)
+  refresh_hz: 10 # TRD Time stepping / NFR-03
+  default_race_laps: 15 # owner hackathon H7: the setup screen starts with a 15-lap race (fuel is fine; the 53-lap race runs out of fuel at laps 41-46 until T-02B)
+  # Used for any team whose color_hex is missing from the grid file. Team
+  # colours themselves live in config/grid/<grid>.yaml and are never hard-coded
+  # in UI code (docs/spec/UI_DESIGN.md).
+  fallback_palette:
+    - "#8C8C8C"
+    - "#5B8DEF"
+    - "#E0A030"
+    - "#4FB286"
+    - "#C05070"
+    - "#7A5BA6"
+
+radar:
+  # F11 Rival Battery Radar. These are the RADAR's own model constants and must
+  # stay deliberately different from the simulator's true team values, so the
+  # Radar Estimate carries realistic model error (TRD RIVAL BATTERY RADAR).
+  resample_hz: 10 # TRD RIVAL BATTERY RADAR step 1
+  savgol_window: 7 # TRD RIVAL BATTERY RADAR step 1
+  savgol_order: 2 # TRD RIVAL BATTERY RADAR step 1
+  # Starting values from the Rival Battery Radar spec (owner decision round 2),
+  # finalised in T-051. CdA is not a constant: it is fitted per car per aero
+  # mode by least squares (TRD RIVAL BATTERY RADAR step 4).
+  mass_kg: 800 # SOURCE: Radar spec
+  p_ice_kw: 400 # SOURCE: Radar spec
+  p_elec_max_kw: 350 # SOURCE: Radar spec
+  e_max_mj: 4.0 # SOURCE: Radar spec
+  eta: 0.92 # SOURCE: Radar spec (driveline efficiency)
+  rho: 1.18 # SOURCE: Radar spec (air density, kg/m^3)
+  c_rr: 0.012 # SOURCE: Radar spec
+  min_confidence: 0.5 # SOURCE: Radar spec; estimates and alerts below this are shown greyed
+  # How fast confidence decays after the last re-anchor (step 8). Not in the
+  # Radar spec; set in T-051 from the Radar-on-sim error growth (see TRD).
+  confidence_half_life_s: 300.0 # STRUCTURAL (owner, sprint day 4; was 120 from T-051): halves 5 min after the last anchor
+  # T-051 STRUCTURAL Radar settings (not in the Radar spec):
+  full_throttle_pct: 98.0 # STRUCTURAL: "full throttle" in the feed (1 % steps, noisy)
+  lift_throttle_pct: 10.0 # STRUCTURAL: below this, off throttle (LIFT)
+  state_threshold_kw: 50.0 # STRUCTURAL: P_elec above this = DEPLOY (step 5)
+  fit_min_speed_kmh: 180.0 # STRUCTURAL: CdA fit window in Straight Mode zones (step 4), full deployment assumed,
+  fit_max_speed_kmh: 280.0 # STRUCTURAL: below the MGU-K taper
+  fit_min_samples: 20 # STRUCTURAL: samples before a CdA fit is used
+  anchor_min_s: 1.0 # STRUCTURAL: sustained CLIP in a Straight Mode zone re-anchors to 0 (step 7)
+  start_energy_mj: 4.0 # STRUCTURAL: battery assumed full at the start (charged on the formation lap)
+  start_prior_confidence: 0.5 # owner, sprint day 5: the start estimate (assumed full) has confidence 0.5, decaying with the half-life until the first anchor
+  missing_window_s: 10.0 # STRUCTURAL: window for the received-frames share (step 8)
+
+track_builder:
+  # F01 / PF-01 track builder. resample_m and length_tolerance are the T-010
+  # acceptance values; the rest are STRUCTURAL builder defaults (not rule or
+  # calibration values), accepted by the owner (round 6) and to be re-checked
+  # against the real Suzuka layout in T-011.
+  resample_m: 1.0 # TRD F01: 1 m resampled centre line
+  length_tolerance: 0.01 # T-010 acceptance: length within +-1% of official
+  max_closure_gap_m: 50.0 # STRUCTURAL: lap start/end samples must be this close
+  smoothing_rms_m: 1.0 # STRUCTURAL: expected position noise for the splprep fit
+  # T-02A (owner round 13, curvature check): splprep's adaptive knots cut
+  # Degner 1 (R 130 m) and sharpened Degner 2 / T17 (31 / 16 m) against the
+  # radii implied by real corner speeds (81 / 46 / 27 m). A penalized spline
+  # smooths the same everywhere; lambda 5000 gives the smallest RMS log error
+  # over the grip-limited corners (0.15, worst 0.29) with the raw length -0.75 %.
+  centre_line_fit: penalized # STRUCTURAL (T-02A, owner round 14: on for the refit)
+  smoothing_lambda_m3: 5000.0 # STRUCTURAL (T-02A curvature check)
+  straight_max_curvature_per_m: 0.002 # STRUCTURAL: radius >= 500 m counts as straight
+  straight_min_length_m: 200.0 # STRUCTURAL: shorter flat runs are not tagged
+  # T-029 (owner round 11): average the fastest N clean qualifying laps, one per
+  # driver, before fitting the centre line. Each lap is placed along a reference
+  # line (the fastest lap) and the pooled samples are averaged in bins of
+  # pool_bin_m. Suzuka: N = 5 opens the Esses from 64 m to 68 m (10th-percentile
+  # radius); 5 m bins gave the steadiest straights of 3 / 4 / 5 / 8 m.
+  pool_laps: 5 # STRUCTURAL (owner default)
+  pool_bin_m: 5.0 # STRUCTURAL
+  # Owner decision round 6: the car's path cuts corners, so scale the built line
+  # uniformly about its centroid to exactly official_length_m (lap times are
+  # calibrated against the real length in T-026). The +-1% check still runs on
+  # the raw, unscaled length.
+  normalize_length: true
+  # T-02D (owner round 15): corners whose curvature comes from the track's
+  # geometry_source.outline. Window: half-way to the neighbouring corners, at
+  # most outline_window_max_m each side (the T-02A curvature check's window),
+  # blended in over outline_blend_m at both ends.
+  outline_window_max_m: 80.0 # STRUCTURAL
+  outline_blend_m: 20.0 # STRUCTURAL
+
+physics:
+  # Owner round 9 (T-024). rho_fallback is used when a track has no
+  # air_temp_c / air_pressure_hpa; v_min_ms keeps P / v finite at standstill
+  # (F_drive = min(eta * P / max(v, v_min), grip)).
+  rho_fallback: 1.20 # STRUCTURAL
+  v_min_ms: 1.0 # STRUCTURAL
+
+aero:
+  # F02 active aero (TRD Active aero): Straight Mode on zones tagged
+  # straight_mode_allowed "when throttle >= threshold"; docs/spec/TRD.md gives no
+  # threshold. STRUCTURAL: near-full throttle.
+  straight_mode_throttle_min: 0.95 # STRUCTURAL
+
+dirty_air:
+  # F02 (TRD Dirty air and slipstream, T-032). Within range_m of the car ahead
+  # f = 1 - gap / range_m; ClA x (1 - downforce_loss_max f). The TRD marks the
+  # coefficients UNKNOWN, calibrated in F20 (overtakes per race).
+  range_m: 60.0 # PLACEHOLDER: calibrate (F20)
+  downforce_loss_max: 0.25 # PLACEHOLDER: calibrate (F20)
+
+slipstream:
+  # CdA x (1 - drag_reduction_max f), same f and range as dirty_air.
+  drag_reduction_max: 0.3 # PLACEHOLDER: calibrate (F20)
+
+overtake:
+  # TRD OVERTAKE MODEL / PF-11 (T-034): an attempt when the attacker is within
+  # trigger_gap_m of the car ahead entering a braking or overtaking zone;
+  # p_pass = sigmoid(w_dv dv + w_grip dgrip + w_overtake_mode OT + w_racecraft
+  # drc - w_defend DEFEND - w_difficulty difficulty). The TRD marks the weights
+  # and zone difficulty UNKNOWN, calibrated so overtakes per race match 2026
+  # (F20).
+  trigger_gap_m: 20.0 # PLACEHOLDER: calibrate (F20)
+  follow_gap_m: 6.0 # STRUCTURAL: about one car length, the closest a car follows without passing
+  w_dv_per_ms: 0.30 # GAMEPLAY-TUNED (sprint), recalibrate in T-02C; dv at the braking point, m/s (was 0.5: 128 overtakes per race)
+  w_grip: 20.0 # PLACEHOLDER: calibrate (F20); dgrip as tyre friction coefficient
+  w_overtake_mode: 1.5 # GAMEPLAY-TUNED (sprint), recalibrate in T-02C (was 1.0)
+  w_racecraft: 1.0 # PLACEHOLDER: calibrate (F20); skill_racecraft difference
+  w_defend: 2.5 # GAMEPLAY-TUNED (sprint), recalibrate in T-02C (was 1.0)
+  w_attack: 2.5 # GAMEPLAY-TUNED (sprint), recalibrate in T-02C; ATTACK instruction term (mirrors w_defend)
+  w_difficulty: 1.0 # PLACEHOLDER: calibrate (F20)
+  zone_difficulty_default: 4.0 # GAMEPLAY-TUNED (hackathon H7, owner session 5; was 2.0), recalibrate in T-02C: 8 passes per 15-lap race after lap 1 (real 2026 Japanese GP ~5 per 15 laps, counted from OpenF1 positions); ATTACK / DEFEND call outcome +12 / +18 points
+  braking_zone_difficulty: 5.5 # GAMEPLAY-TUNED (hackathon H7, was 3.5), recalibrate in T-02C; braking zones outside overtaking zones
+  braking_trigger_min_drop_kmh: 60.0 # STRUCTURAL: braking zones with at least this speed drop are trigger points
+  fail_time_loss_s: 0.3 # PLACEHOLDER: calibrate (F20); TRD dt_fail
+
+pit:
+  # TRD PIT LANE stationary time (T-035): Normal(stop_mean_s, stop_sd_s) clipped
+  # at stop_min_s, plus slow_stop_extra_s with probability slow_stop_p (RNG
+  # stream "pit"). SOURCE: python -m pitwall_sim.calibration.pit_stops --track
+  # suzuka: OpenF1 /pit stop_duration, 2026 Japanese GP (session 11253), 20
+  # stops; slow = above Q3 + 1.5 IQR. One race only: F20 may pool more races.
+  stop_mean_s: 3.01
+  stop_sd_s: 0.67
+  stop_min_s: 2.0
+  slow_stop_p: 0.05
+  slow_stop_extra_s: 3.59
+  box_fraction: 0.5 # STRUCTURAL: the box is this far along the pit lane (entry 0 .. exit 1)
+  entry_decel_ms2: 20.0 # STRUCTURAL: braking on the pit entry road to reach the limit line at the limit
+
+rival_strategy:
+  # F08 Rival Strategy AI (T-041, TRD RIVAL STRATEGY AI, PF-10). STRUCTURAL
+  # defaults; team aggression and strategy_style come from
+  # teams/performance.yaml (placeholders until F20 / T-02C).
+  stop_fraction: {AGGRESSIVE: 0.40, BALANCED: 0.48, CONSERVATIVE: 0.56} # planned stop at this share of the race
+  teammate_offset_laps: 2 # the second car of a team stops this many laps later
+  stop_jitter_laps: 2 # +- uniform jitter on the planned stop lap (RNG stream rival_strategy)
+  window_laps: 3 # the stop may come this many laps early
+  wear_threshold: 0.6 # inside the window: box once the tyre wear reaches this
+  critical_wear: 0.85 # box at any time (an extra stop) at this wear
+  no_stop_last_laps: 3 # never box in the last laps
+  undercut_gap_s: 1.5 # inside the window: box if the car behind is this close
+  battle_gap_s: 1.0 # TRD: battle within 1.0 s
+  attack_margin_mj: 0.6 # attack when own battery exceeds the opponent's estimate by margin x (1.5 - aggression)
+  defend_margin_mj: 0.3 # defend unless the attacker's estimate exceeds own battery by margin x (0.5 + aggression)
+  low_battery_mj: 1.0 # battery at the line below this: HARVEST
+  recover_battery_mj: 2.5 # until the battery at the line is back to this
+  push_final_laps: 3 # PUSH in the last laps (battery above low_battery_mj)
+
+ai_driver:
+  # F04 AI Driver (T-031, TRD AI DRIVER). Owner values are sourced; the rest are
+  # STRUCTURAL defaults the TRD names without a number, to calibrate with race
+  # behaviour (overtakes, stint lengths) later.
+  boost_reserve_mj: 0.3 # owner round 7: never boost below this battery energy
+  boost_gap_s: 1.0 # owner round 7: BALANCED boosts only within 1.0 s of a car
+  hold_gap_s: 0.8 # TRD AI DRIVER HOLD_POSITION: keep >= 0.8 s
+  grip_margin: 0.98 # STRUCTURAL: share of the grip the reference speed uses
+  push_lap_grip_margin: 1.0 # STRUCTURAL: PUSH_LAP uses all of it
+  manage_tyres_grip_margin: 0.95 # STRUCTURAL
+  push_lap_mgmt_factor: 1.15 # STRUCTURAL: tyre wear multiplier on a push lap
+  manage_tyres_mgmt_factor: 0.8 # STRUCTURAL: TRD driver_mgmt_factor < 1
+  harvest_target_mj_per_lap: 0.5 # STRUCTURAL: TRD harvest_target_mj
+  balanced_headroom_mj: 1.0 # STRUCTURAL: BALANCED holds the battery at most this far below full
+  energy_feedback_gain: 0.5 # STRUCTURAL: share of last lap's energy miss corrected next lap
+  lift_coast_m: 80.0 # STRUCTURAL: lift before a braking zone
+  lift_coast_min_drop_kmh: 60.0 # STRUCTURAL: only braking zones with this speed drop
+  superclip_zone_m: 120.0 # STRUCTURAL: super-clip over the last metres of a zone
+  # T-037: a car well below its reference speed (after a spin, at a pit exit)
+  # does not lift; without this a lift point could hold a stopped car still.
+  lift_min_speed_share: 0.8 # STRUCTURAL
+
+weather:
+  # F07 weather dynamics (T-039, TRD WEATHER, PF-14); per-track statistics
+  # (rain_p_per_race, transition_matrix, evolution_per_lap) are in the track
+  # config. No source gives these: placeholders until calibrated against real
+  # wet races (T-02C or later).
+  step_s: 60.0 # TRD: Markov transitions per minute
+  rain_intensity: {DRY: 0.0, DAMP: 0.25, WET: 0.6, HEAVY_WET: 1.0} # PLACEHOLDER: calibrate
+  wetting_per_min: 0.4 # PLACEHOLDER: calibrate (wetness rise per minute at intensity 1)
+  drying_per_min: 0.02 # PLACEHOLDER: calibrate
+  car_drying_per_min: 0.06 # PLACEHOLDER: calibrate (whole field on track)
+  evolution_wash_per_min: 0.5 # PLACEHOLDER: calibrate
+  forecast_horizon_s: 600.0 # TRD: noisy forecast of the next 10 min
+  forecast_noise_sd: 0.1 # PLACEHOLDER: calibrate
+  replan_grip_step: 0.02 # STRUCTURAL: rebuild a car's plan when its grip moves by 2 %
+
+mistakes:
+  # F04 AI Driver mistakes (T-037, TRD AI DRIVER: per-corner probability from
+  # driver skill, tyre wear, wetness -> lock-up / off-track / spin / crash).
+  # p = base x (1 + consistency_gain x (1 - skill_consistency))
+  #          x (1 + wear_gain x tyre_wear) x (1 + wet_gain x track_wetness),
+  # drawn at every corner a car passes, RNG stream `mistakes` (HR-04). No
+  # source gives these numbers: placeholders until race calibration (T-02C).
+  # With skill_consistency at its 0.0 placeholder (Suzuka, 53 laps): expected ~3
+  # mistakes per car per race (60 % lock-ups), ~0.35 crashes per race over 22 cars.
+  base_p_per_corner: 0.001 # PLACEHOLDER: calibrate
+  consistency_gain: 1.0 # PLACEHOLDER: calibrate
+  wear_gain: 2.0 # PLACEHOLDER: calibrate
+  wet_gain: 4.0 # PLACEHOLDER: calibrate
+  kind_shares: {LOCK_UP: 0.6, OFF_TRACK: 0.3, SPIN: 0.095, CRASH: 0.005} # PLACEHOLDER: calibrate
+  # Speed kept after the mistake; the car then accelerates again, so the time
+  # lost emerges from the drive. A crash retires the car (incidents: T-038).
+  speed_factor: {LOCK_UP: 0.9, OFF_TRACK: 0.6, SPIN: 0.0} # PLACEHOLDER: calibrate
+  lock_up_wear: 0.02 # PLACEHOLDER: calibrate (flat spot)
+
+race_events:
+  # Hackathon H4 (simplified T-038, docs/HACKATHON_SCOPE.md): Safety Car and VSC.
+  # Owner values (hackathon session 2, "Round 16"): vsc_delta_factor, sc_pace_factor,
+  # car_length_m. Every other value is HAND-SET for the demo, not calibrated.
+  vsc_delta_factor: 1.35 # owner: under VSC every car runs at race pace / 1.35
+  sc_pace_factor: 1.40 # owner: the Safety Car queue runs at race pace / 1.40
+  car_length_m: 5.5 # owner
+  sc_gap_m: 55.0 # owner session 2: the field bunches to 55 m gaps (10 car lengths)
+  sc_catch_up_scale: 0.9 # HAND-SET: a car further than sc_gap_m behind the car ahead closes at 0.9 x race pace
+  sc_laps: 3 # HAND-SET: leader line crossings behind the SC; the last lap is SC_IN_THIS_LAP
+  vsc_duration_s: 100.0 # HAND-SET
+  crash_on_line_p: 0.5 # HAND-SET: share of crashes stopped on the racing line (SC); the rest off it (VSC)
+  rival_box_window_laps: 5 # HAND-SET: under SC / VSC a Rival boxes if its planned stop is at most this many laps away
+  rival_box_min_laps_left: 3 # HAND-SET: ... and at least this many laps remain
+
+strategy_panel:
+  # Hackathon H5: pit plans forked in background processes (live/strategy.py).
+  workers: 3 # STRUCTURAL: worker processes, ~0.3 GB each; one refresh (13 plans x 4 forks x 8 laps) ~20 s
+
+demo:
+  scripted_sc_lap: null # demo: force a Safety Car when the leader starts this lap (null = off)
+
+race_engine:
+  # F05 race engine (T-033). STRUCTURAL defaults unless noted.
+  grid_slot_spacing_m: 8.0 # ASSUMED: FIA staggered grid, 8 m between consecutive slots
+  pole_offset_m: 5.0 # STRUCTURAL: pole slot behind the timing line
+  start_battery_fraction: 1.0 # STRUCTURAL: battery full at the start (charged on the formation lap)
+  start_compound: MEDIUM # STRUCTURAL: until Race Setup / strategy picks start tyres
+  timing_loop_spacing_m: 200.0 # STRUCTURAL: mini-sector loops for gaps (plus sector ends, detection)
+  max_race_factor: 2.0 # STRUCTURAL: give up after this x (laps x 120 s) of sim time
+
+openf1:
+  # Backup source for track geometry when FastF1 has no live-timing data (owner
+  # decision round 5). Free tier, no auth, historical data from 2023.
+  base_url: https://api.openf1.org/v1
+  max_requests_per_s: 3 # OpenF1 free-tier rate limit
+  max_requests_per_min: 30 # OpenF1 free-tier rate limit
+  timeout_s: 60.0
+
+multiviewer:
+  # Circuit corner positions for track configs (T-011, track/landmarks.py); the
+  # same source FastF1's get_circuit_info uses. Free, no auth.
+  base_url: https://api.multiviewer.app/api/v1
+
+predictor:
+  n_samples: 16 # TRD STRATEGY PREDICTOR default
+  horizon_laps: 15 # TRD STRATEGY PREDICTOR default
+
+debrief:
+  k_alternatives: 4 # TRD DEBRIEF AND SCORING default
+  n_seeds: 8 # TRD DEBRIEF AND SCORING default
+  score_scale_s: 20 # owner decision 2026-10-19: 5 s loss -> 78 pts, 10 s -> 61, 20 s -> 37
+
+acceleration_zones:
+  # T-027: zones from the speed profile, corner exit -> next braking point.
+  min_length_m: 200.0 # STRUCTURAL (TASKS T-027 default)
+  min_speed_change_kmh: 20.0 # STRUCTURAL: smaller dips do not split a stretch
+  reference_rule_set: 2026_post_miami # the Rule Set whose MGU-K caps use the zones
+
+alerts:
+  # Sprint A-1 (docs/planning/SPRINT.md): pit-wall alerts from Our Car's view. Values are
+  # the owner's sprint spec (Rival Battery Radar rules); provider selects the
+  # plug-in (later external:<module.path> for the real Simply Clipping).
+  provider: simply_clipping_lite
+  attack_gap_s: 1.0 # car ahead within 1.0 s
+  defend_gap_s: 0.6 # car behind within 0.6 s
+  energy_margin_mj: 0.8 # rival estimate this far below (ATTACK) / above (DEFEND) our battery
+  repass_window_s: 15.0 # we passed a car in the last 15 s
+  repass_battery_mj: 1.0 # and our battery is below 1.0 MJ
+  repass_straight_m: 600.0 # and a straight longer than 600 m is ahead
+  closing_dv_kmh: 40.0 # speed difference over 40 km/h
+  closing_range_m: 200.0 # to a car within 200 m
+  closing_min_straight_left_m: 150.0 # STRUCTURAL: the CLIP / LIFT car has this much straight ahead (not lifting for the corner)
+  suppress_laps: 1.0 # same pair + type suppressed for 1 lap
+  expiry_s: 8.0 # alert lifetime (or until its condition clears)
+  min_confidence: 0.4 # owner, sprint day 4: no alert at all below this confidence
+  low_confidence: 0.6 # owner, sprint day 4: 0.4-0.6 shown greyed, >= 0.6 normal
+  hold_s: 1.0 # owner, sprint day 4: the condition holds 1.0 s (2 decision ticks) before firing
+  detection_min_share: 0.7 # owner, sprint day 5: observed-clip ATTACK needs >= 70 % of the rival's feed samples on that straight
+  battery_reserve_mj: 0.3 # owner, sprint day 5 (own-battery DEFEND): the reserve, as ai_driver.boost_reserve_mj
+  clip_min_s: 1.0 # STRUCTURAL (sprint day 5): "seen clipping" = CLIP for >= 1 s on a straight, as radar.anchor_min_s (single CLIP samples are partial deployment)
+
+export:
+  # Sprint S-1 (docs/planning/SPRINT.md Part 5): FastF1-like feed files and Ground Truth for
+  # testing Simply Clipping. Owner addendum values unless marked STRUCTURAL.
+  truth_hz: 10.0 # ground truth every 0.1 s
+  stream_rate_hz: [3.7, 4.0] # car_data and pos_data each ~3.7-4 Hz, independent timestamps
+  jitter_s: 0.03 # +-30 ms timestamp jitter
+  drop_p: 0.05 # ~5 % single missing frames
+  gap_rate_per_min: 0.5 # STRUCTURAL: occasional longer gaps, per stream per minute
+  gap_s: [0.5, 2.0] # gaps of 0.5-2 s
+  speed_noise_kmh: 0.5 # sigma
+  position_noise_m: 1.0 # sigma
+
+engineer:
+  # F12 Engineer Command validation (T-060). Values from the TRD ENGINEER
+  # COMMANDS table; the command delay is radio.radio_latency_s.
+  let_teammate_by_gap_s: 2.0 # TRD: LET_TEAMMATE_BY needs the teammate within 2.0 s behind
+  push_lap_max_laps: 5 # TRD: PUSH_LAP laps 1..5
+  call_max_laps: 2 # owner (sprint day 5): ATTACK until a pass, DEFEND until the threat clears, at most 2 laps
+  defend_clear_gap_s: 1.0 # owner (sprint day 5): the threat has cleared once it is more than 1.0 s behind
+
+radio:
+  # F14, R3 only. MVP code must not import llama_cpp (MVP.md CONSTRAINTS).
+  # Owner decision 2026-10-19: Gemma 3 270M, fine-tuned on generated
+  # engineer-phrase -> command pairs, converted to GGUF, CPU only (8 GB RAM, no
+  # GPU). The path below is the fine-tuned artefact produced by T-208, not a
+  # stock download. Q8_0 quantisation preferred for a model this small (round 2).
+  model_path: models/gemma-3-270m-it-pitwall.gguf
+  model_variant: "gemma-3-270m-it"
+  radio_latency_s: 1.0 # TRD ENGINEER COMMANDS: effective_at_s offset, default 1.0
+  parse_timeout_s: 2.0 # TRD Engineer text -> command default
+  reply_timeout_s: 1.5 # TRD Driver replies default
+
+calibration:
+  # Owner round 15 (calibration acceptance, MVP scope): MUST lap time within 2 %,
+  # order within +-2, plausibility limits met, no bound hits on shared tyre
+  # coefficients; SHOULD speed RMSE <= 15 km/h; 15-20 km/h with every MUST met is
+  # accepted with the per-corner residuals in docs/results/CALIBRATION_NOTES.md.
+  speed_rmse_kmh: 15 # owner round 15 (SHOULD; was 12)
+  speed_rmse_kmh_provisional: 20 # owner round 15: accepted when every MUST is met
+  lap_time_tolerance: 0.02 # NFR-06 / MVP-02: within 2% of the reference lap
+  max_order_error: 2 # T-026 (owner round 10): simulated team order within +-2 places
+  # Owner round 13: a reference speed trace counts only if its valid samples
+  # cover >= 22 of the 24 sections of 250 m (Suzuka); the target lap time is
+  # still the team's fastest lap.
+  coverage_section_m: 250.0
+  min_section_coverage: 22
+  # Plausibility of a calibrated lap (owner round 14, STRUCTURAL): peak lateral and
+  # braking acceleration, and the Esses (Suzuka S Curves) minimum speeds may not
+  # exceed the real ones (median over the teams' laps) by more than this.
+  max_lateral_g: 5.5
+  max_braking_g: 6.0
+  esses_corners: [T3, T4, T5, T6]
+  esses_max_excess_kmh: 15.0
+  # Physically plausible bounds for the T-026 fit (owner round 10). A value that
+  # ends on a bound means the model, not the number, is wrong: report it, do not
+  # widen the bound.
+  bounds:
+    # Effective slick friction including load sensitivity; F1 slicks ~1.5-2.0.
+    mu_base_soft: [1.30, 2.20]
+    # Longitudinal vs lateral grip of the same tyre; real tyres are within +-20%.
+    long_grip_ratio: [0.80, 1.20]
+    # Downforce area in Corner Mode; 2022-25 cars ~4.5-5.5 m^2, 2026 cars have
+    # less downforce.
+    cla_corner: [2.50, 6.00]
+    # Drag area in Straight Mode (wings open); low-drag F1 ~0.5-0.8 m^2.
+    cda_straight: [0.40, 1.00]
+    # Drag area in Corner Mode (wings closed); F1 ~0.9-1.4 m^2.
+    cda_corner: [0.70, 1.60]
+    # Per-team ICE power vs the 400 kW nominal (owner: 0.97-1.03).
+    pu_power_scale: [0.97, 1.03]
+    # Tyre load sensitivity exponent (owner round 14: plausible 0.05-0.30).
+    k_load: [0.05, 0.30]

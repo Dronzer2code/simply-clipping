@@ -1,0 +1,66 @@
+# F03 Rule Set: 2026 regulations as raced before the Miami Grand Prix.
+#
+# Reference source for the pre-Miami values, per owner decision (2026-10-19):
+# Formula1.com, "Explained: 2026 power unit regulations". Values that article
+# does not state come from later owner decisions (rounds 2 and 3) and carry
+# their own SOURCE note; nothing here is guessed (HR-09). Agents MUST still
+# verify against the FIA 2026 Technical and Sporting Regulations before marking
+# any value VERIFIED.
+
+rule_set_id: 2026_pre_miami
+# Season start: 2026 Australian Grand Prix, race day (same convention as the
+# post-Miami file, which uses the Miami race date). Owner decision.
+effective_from: "2026-03-08" # Australian Grand Prix
+
+power:
+  p_ice_max_kw_nominal: 400 # SOURCE: F1.com
+  p_k_max_kw: 350 # SOURCE: F1.com
+  # Pre-Miami caps are a single value across all zones (350 kW), expressed in
+  # the same per-zone structure as post-Miami.
+  zone_caps_kw:
+    acceleration_zone: 350
+    other: 350
+  boost_net_cap_kw: null # no net addition cap before Miami
+  # F1.com: MGU-K deployment tapers from 290 km/h to zero at 355 km/h.
+  boost_taper_start_kmh: 290 # SOURCE: F1.com
+  boost_taper_end_kmh: 355 # SOURCE: F1.com
+  wet_deploy_max_kw: null # no wet-race limit before Miami (owner round 16)
+
+overtake:
+  # F1.com: Overtake mode gives 350 kW up to 337 km/h, ~0.5 MJ extra per lap,
+  # available within 1 s of the car ahead.
+  activation_gap_s: 1.0 # SOURCE: F1.com
+  taper_start_kmh: 337 # SOURCE: F1.com
+  taper_end_kmh: 355 # SOURCE: F1.com (same zero point as the boost taper)
+  extra_energy_mj_per_lap: 0.5 # SOURCE: F1.com, approx
+
+energy:
+  # Not in the F1.com article. 4.0 MJ is carried over from the Rival Battery
+  # Radar spec and is an estimate, not a verified regulation value.
+  e_usable_max_mj: 4.0 # ESTIMATE: from Rival Battery Radar spec; verify
+  # Default only (owner decision round 2): config/tracks/<track_id>.yaml MAY
+  # override it, and the Race Setup screen lets the user change it before the
+  # start. 8.5 MJ + 0.5 MJ Overtake extra = 9.0 MJ with Overtake active.
+  # F1.com also gives ~8.5 MJ/lap braking recovery.
+  harvest_max_mj_per_lap_race: 8.5 # SOURCE: PlanetF1 Miami GP clarification; standard GP value
+  harvest_max_mj_per_lap_quali: 8.0 # reported (docs/spec/TRD.md RULE SET VALUES)
+  # No per-lap deploy limit: deployment is bounded by the battery window and the
+  # harvest limit only (owner decision round 2).
+  deploy_max_mj_per_lap: null
+  superclip_power_kw: 250 # reported (docs/spec/TRD.md RULE SET VALUES)
+  # No mandatory per-lap counter reset at formation lap start before the Miami
+  # update (owner decision round 2).
+  energy_counter_reset: none
+
+car:
+  # Owner decision round 3 (2026-10-19).
+  min_mass_kg: 768 # SOURCE: GPFans 2026 regs explained ("minimum weight of 768kg, without its fuel")
+
+fuel:
+  max_fuel_energy_flow_mj_per_h: 3000 # SOURCE: PlanetF1 2026 engine regs explained ("3000 MJ (from fuel) per hour")
+
+race:
+  # 3rd offence: black-and-white flag (warning). 4th and every later offence:
+  # 5 s time penalty. Races and sprints only; in qualifying, laps over track
+  # limits are deleted instead.
+  track_limits_warnings_before_penalty: 3 # SOURCE: FIA 2026 penalty guidelines via formulaonehistory.com

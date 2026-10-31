@@ -1,0 +1,71 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pitwall_sim"
+version = "0.1.0"
+description = "Desktop 2D Formula 1 race simulator for the 2026 regulations"
+requires-python = ">=3.13,<3.14"
+dependencies = [
+  "numpy==2.5.4",
+  "numba==0.68.0",
+  "scipy==1.18.1",
+  "polars==2.0.0",
+  "pyarrow==26.0.0",
+  "fastf1==3.8.3",
+  "pyyaml==6.0.3",
+  "pydantic==2.14.1",
+  "PySide6==6.12.0",
+  "pyqtgraph==0.14.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest==9.1.1",
+  "pytest-qt==4.5.0",
+  "hypothesis==6.170.1",
+  "ruff==0.17.1",
+  "mypy==2.4.0",
+  "import-linter==2.15",
+  "types-PyYAML==6.0.12.20260906",
+]
+# R3 only. MVP (R1) code MUST NOT import llama_cpp (MVP.md CONSTRAINTS).
+radio = ["llama-cpp-python==0.3.36"]
+
+[tool.setuptools.packages.find]
+include = ["pitwall_sim*", "simply_clipping*"]
+
+[tool.setuptools.package-data]
+simply_clipping = ["config.yaml"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+# Spec documents are source of truth prose, not code; ruff must not rewrite their snippets.
+exclude = ["docs", ".venv"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "D"]
+ignore = ["D203", "D213"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["D100", "D103"]
+"simply_clipping/tests/*" = ["D100", "D103"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests", "simply_clipping/tests"]
+markers = [
+  "slow: full races and calibration runs",
+  "ui: pytest-qt user interface tests",
+  "llm: requires a local Gemma model file",
+]
+
+[tool.mypy]
+python_version = "3.13"
+strict = true
+
+[[tool.mypy.overrides]]
+# Third-party packages without type stubs or a py.typed marker.
+module = ["fastf1.*", "pyarrow.*", "scipy.*", "pyqtgraph.*", "pandas.*"]
+ignore_missing_imports = true

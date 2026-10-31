@@ -1,0 +1,170 @@
+# F01 track config: Suzuka (2026 Japanese Grand Prix, 29 March 2026).
+#
+# All s values are metres along data/tracks/suzuka.parquet (normalized to
+# official_length_m, s = 0 at the timing line). A zone with s_end_m < s_start_m
+# crosses s = 0. Calibration coefficients stay UNKNOWN until F20 (HR-09).
+#
+# Reproduce the corner and pit numbers with:
+#   python -m pitwall_sim.track.landmarks --track suzuka
+
+track_id: suzuka
+fastf1_event: "Japan"
+geometry_source:
+  year: 2026
+  session: "Q"
+  driver: fastest
+  source: openf1 # written by track/builder.py: provider of the last build
+  # T-02D (owner round 15): curvature at the listed corners comes from this
+  # public outline (projected, fitted like the OpenF1 line, scaled to 5807 m and
+  # aligned to it). Corners: per corner the source whose radius is closer to the
+  # one implied by real minimum speeds; written by
+  #   python -m pitwall_sim.calibration.corner_sources --track suzuka --write
+  # SOURCE: https://github.com/bacinger/f1-circuits circuits/jp-1962.geojson
+  # (MIT; notice in data/tracks/outlines/LICENSE-bacinger-f1-circuits.md),
+  # 172 points traced from a map, not official F1 data.
+  outline:
+    provider: bacinger/f1-circuits
+    file: outlines/jp-1962.geojson
+    licence: MIT
+    revision: aa0e5ba634bc287b4941231c8c105a1413074631
+    # Owner round 16: reverted to the OpenF1 line (the T-02D fit FAILed).
+    corners: []
+official_length_m: 5807 # SOURCE: Williams F1 2026 Japan overview; ESPN circuit page (5.807 km)
+race_laps: 53 # SOURCE: Japanese GP race distance 53 laps (307.471 km = 53 x 5.807 km)
+# Timing sector ends (T-033). SOURCE: python -m pitwall_sim.track.landmarks
+# --track suzuka: median over the 5 fastest 2026 Q laps (one per driver, OpenF1
+# session 11249) of where each car is at its official sector 1 / sector 2 time.
+sector_ends_m: [2186, 4708]
+
+# Race-day defaults (owner round 9). Air density = p / (287.05 * T), computed
+# once per race (T-024); weather (T-039) may update it.
+air_temp_c: 20.0 # PLACEHOLDER: standard atmosphere until real race-day data
+air_pressure_hpa: 1013.0 # PLACEHOLDER: standard atmosphere until real race-day data
+fuel_start_kg: 70.0 # PLACEHOLDER: calibrate (T-026) so the race ends with >= 0 kg
+# Fuel load of the qualifying reference lap used by calibration (owner round 10).
+quali_fuel_kg: 5.0 # PLACEHOLDER: not published
+
+# Straight Mode (active aero) zones. SOURCE: Formula1.com Suzuka circuit guide
+# (2026): "just two Straight Mode zones, one along the start/finish straight,
+# and another down the back straight between Turns 14 and 15"; PlanetF1 confirms
+# the new back-straight zone "between Spoon Curve and 130R". Neither gives metre
+# markers, so each zone spans the builder's auto-tagged straight in that place
+# (main straight T18 -> T1, back straight T14 -> T15). The third auto-tagged
+# straight (5095-5316 m, 130R -> T16) is not a Straight Mode zone.
+#
+# T-02A (penalized centre-line fit, 2026-10-24): corners, pit and detection
+# re-checked with landmarks (moved <= 2 m; pit entry +4 m, exit -4 m); the
+# straights 130R -> T16 and T9 -> T11 are no longer auto-tagged (their radius
+# was at the 500 m threshold); ST3 stays an owner-assigned acceleration zone.
+#
+# T-029 (pooled 5-lap geometry, 2026-10-24): every s value below was re-checked
+# on the rebuilt model (corners moved 0-2 m, pit entry 5 m, pit exit 13 m). The
+# rebuilt model also tags a fourth straight, 2469-2694 m (T9 Degner -> T11
+# hairpin); it is NOT tagged here (the owner's acceleration-zone decision named
+# three straights) and is left for T-027's speed-profile zones.
+#
+# acceleration_zone tags (post-Miami 350 kW MGU-K zones; 250 kW elsewhere).
+# Only 2026_post_miami uses them; 2026_pre_miami has a single 350 kW cap.
+# ASSUMED: FIA published no post-Miami zones for Suzuka (2026 race was
+# pre-Miami); straights used per Miami practice (corner exit -> braking point at
+# 350 kW). Owner decision: all three auto-tagged straights now, replaced by
+# zones derived from the speed profile in T-027 (FIA-published zones always win).
+acceleration_zones_source: manual
+# T-027 (owner round 16: stored, not applied): zones derived from the speed
+# profile, corner exit -> next braking point >= 200 m. Used only if the source
+# above becomes `derived`. Reproduce: python -m pitwall_sim.track.accel_zones --track suzuka
+derived_acceleration_zones:
+  - [784, 1020]
+  - [1712, 2165]
+  - [2433, 2691]
+  - [2879, 3116]
+  - [3158, 3666]
+  - [3933, 4837]
+  - [4946, 5241]
+  - [5423, 539]
+zones:
+  - zone_id: "SM1"
+    type: straight
+    s_start_m: 5716 # auto-tagged main straight, after T18 (5614) (T-02A geometry; was 5720)
+    s_end_m: 611 # before T1 (695); crosses s = 0 (was 613)
+    tags: [straight_mode_allowed, acceleration_zone] # acceleration_zone ASSUMED (see above)
+  - zone_id: "SM2"
+    type: straight
+    s_start_m: 4082 # auto-tagged back straight, after T14 (3936) (T-02A geometry; was 4096)
+    s_end_m: 4902 # before T15 / 130R (4982) (was 4873)
+    tags: [straight_mode_allowed, acceleration_zone] # acceleration_zone ASSUMED (see above)
+  # Straight from 130R to the T16 chicane: not a Straight Mode zone. The T-02A
+  # penalized geometry no longer auto-tags it (tightest radius 185 m, under the
+  # 500 m straight threshold); it stays an owner-assigned acceleration zone
+  # until T-027 derives the zones from the speed profile.
+  - zone_id: "ST3"
+    type: straight
+    s_start_m: 5095 # after T15 / 130R (4981)
+    s_end_m: 5316 # before T16 (5377)
+    tags: [acceleration_zone] # ASSUMED (see above)
+  # Overtaking zone. SOURCE: Formula1.com Suzuka circuit guide (2026): the
+  # Overtake Mode detection point is at T17, so the attack is down the
+  # start/finish straight into T1. Ends at the T1 corner position.
+  - zone_id: "OT1"
+    type: overtaking
+    s_start_m: 5716 # the main straight's start (T-02A geometry)
+    s_end_m: 695
+    tags: []
+
+# Overtake Mode detection point at T17. SOURCE: Formula1.com Suzuka circuit guide (2026).
+detection_points_m: [5447]
+
+# SOURCE: MultiViewer circuit 46 (layout year 2025, unchanged for 2026),
+# projected onto the centre line; every corner lies within 1.8 m of it.
+corners:
+  - {corner_id: "T1", s_m: 695, name: "Turn 1"}
+  - {corner_id: "T2", s_m: 813, name: "Turn 2"}
+  - {corner_id: "T3", s_m: 1061, name: "Turn 3"}
+  - {corner_id: "T4", s_m: 1192, name: "Turn 4"}
+  - {corner_id: "T5", s_m: 1347, name: "Turn 5"}
+  - {corner_id: "T6", s_m: 1512, name: "Turn 6"}
+  - {corner_id: "T7", s_m: 1845, name: "Turn 7", aliases: ["Dunlop"]} # radio names (H2): common Suzuka nicknames
+  - {corner_id: "T8", s_m: 2261, name: "Turn 8", aliases: ["Degner", "Degner 1"]}
+  - {corner_id: "T9", s_m: 2418, name: "Turn 9", aliases: ["Degner 2"]}
+  - {corner_id: "T10", s_m: 2735, name: "Turn 10"}
+  - {corner_id: "T11", s_m: 2888, name: "Turn 11", aliases: ["hairpin", "the hairpin"]}
+  - {corner_id: "T12", s_m: 3140, name: "Turn 12"}
+  - {corner_id: "T13", s_m: 3779, name: "Turn 13", aliases: ["Spoon", "Spoon curve"]}
+  - {corner_id: "T14", s_m: 3936, name: "Turn 14"}
+  - {corner_id: "T15", s_m: 4982, name: "Turn 15", aliases: ["130R"]}
+  - {corner_id: "T16", s_m: 5377, name: "Turn 16", aliases: ["chicane", "the chicane", "Casio"]}
+  - {corner_id: "T17", s_m: 5447, name: "Turn 17"}
+  - {corner_id: "T18", s_m: 5614, name: "Turn 18"}
+
+pit:
+  # SOURCE: median over 6 OpenF1 race pit stops (session 11253), on the T-029
+  # pooled geometry: where the car
+  # leaves (> 8 m off the centre line) and rejoins. Entry is between T17 and
+  # T18; exit is before T1.
+  entry_s_m: 5566
+  exit_s_m: 440
+  lane_speed_kmh: 80 # docs/spec/TRD.md track template
+  # Speed-limited part of the lane (T-035), centred on the box. SOURCE: python
+  # -m pitwall_sim.calibration.pit_stops --track suzuka: (OpenF1 lane_duration
+  # median 24.3 s - mean stop 3.01 s) x 80 km/h; entry/exit above are where cars
+  # leave / rejoin the racing line, so the slip roads are outside the limit.
+  limit_length_m: 473
+  # Calibration (F20). Candidate reference: MultiViewer pitLoss.normal 22.80 s,
+  # a total pit loss that includes the stationary time, so not used directly.
+  lane_loss_s: UNKNOWN
+abrasiveness: UNKNOWN
+zone_difficulty: {OT1: UNKNOWN} # calibrated (F20)
+weather:
+  # T-039: UNKNOWN in the docs, so placeholders (HR-09) until calibrated against
+  # real Suzuka weather. Per-minute transitions in a rainy race, rows/columns
+  # DRY, DAMP, WET, HEAVY_WET (a dry race stays DRY).
+  rain_p_per_race: 0.2 # PLACEHOLDER: calibrate
+  transition_matrix: # PLACEHOLDER: calibrate
+    - [0.98, 0.02, 0.0, 0.0]
+    - [0.10, 0.80, 0.10, 0.0]
+    - [0.0, 0.10, 0.85, 0.05]
+    - [0.0, 0.0, 0.15, 0.85]
+events:
+  incident_rate_per_lap: UNKNOWN
+  sc_share: UNKNOWN
+evolution_per_lap: 0.0003 # PLACEHOLDER: calibrate (grip gained per leader lap in the dry)

@@ -1,0 +1,69 @@
+[importlinter]
+root_packages =
+    pitwall_sim
+    simply_clipping
+include_external_packages = True
+
+[importlinter:contract:sim-headless]
+name = Simulation core is headless (HR-01)
+type = forbidden
+source_modules =
+    pitwall_sim.race
+    pitwall_sim.car
+    pitwall_sim.track
+    pitwall_sim.driver
+forbidden_modules =
+    pitwall_sim.ui
+    pitwall_sim.radio
+    PySide6
+
+[importlinter:contract:ui-info-barrier]
+name = UI reads only EngineerView (HR-02)
+type = forbidden
+source_modules =
+    pitwall_sim.ui
+forbidden_modules =
+    pitwall_sim.race
+# The UI may not import the race package itself; EngineerView (whose fields use
+# race.state types) and the live session (which owns the engine) reach it only
+# indirectly, and hand the UI EngineerViews (sprint S-5).
+allow_indirect_imports = True
+
+[importlinter:contract:alerts-engineer-view-only]
+name = Alert providers read only EngineerView (sprint A-1, HR-03)
+type = forbidden
+source_modules =
+    pitwall_sim.observe.alerts
+forbidden_modules =
+    pitwall_sim.race
+    pitwall_sim.car
+    pitwall_sim.driver
+    pitwall_sim.observe.radar
+    pitwall_sim.observe.public_feed
+allow_indirect_imports = True
+
+[importlinter:contract:radar-feed-only]
+name = Radar sees only the Public Feed (TRD RIVAL BATTERY RADAR)
+type = forbidden
+source_modules =
+    pitwall_sim.observe.radar
+forbidden_modules =
+    pitwall_sim.race
+    pitwall_sim.car
+    pitwall_sim.driver
+
+[importlinter:contract:simply-clipping-independent]
+name = Simply Clipping stands alone (SIMPLY_CLIPPING_SPEC SC-R01)
+type = forbidden
+source_modules =
+    simply_clipping
+forbidden_modules =
+    pitwall_sim
+
+[importlinter:contract:sim-independent-of-simply-clipping]
+name = The simulator does not import Simply Clipping (plug-in by name only, SC-R01)
+type = forbidden
+source_modules =
+    pitwall_sim
+forbidden_modules =
+    simply_clipping

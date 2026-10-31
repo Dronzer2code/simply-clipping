@@ -1,0 +1,240 @@
+# F19 Grid Config: the real 2026 grid.
+#
+# Source: FastF1 `session.results` for the most recent 2026 race available at
+# build time: 2026 round 17, Singapore Grand Prix (race date 2026-10-11).
+# FastF1 3.8.3, cache at data/fastf1_cache/.
+#
+# team_id values are the FastF1 team ids; driver_id values are the FastF1
+# driver abbreviations. Code references these ids only, never display_name
+# (HR-06), so this file can be swapped for config/grid/fictional.yaml.
+#
+# Frozen snapshot, by owner decision (2026-10-19): normal (New Race) mode always
+# uses this Singapore GP entry list. Compare modes (R4, F17/F18) MUST instead
+# load the entry list of the real race being replayed, from FastF1.
+#
+# The FastF1 driver-info and session-info endpoints return no data for 2026
+# sessions, so TeamColor comes back empty. The two team fields below come from:
+#   - pu_maker  -> confirmed 2026 engine supply (owner, 2026-10-19)
+#   - color_hex -> FastF1 3.8.3 bundled constants, fastf1/plotting/constants.json,
+#                  season "2026", teams.<name>.colors.official (owner decision
+#                  round 3: replaces the earlier approximate colours)
+#
+# Ferrari and Audi are both red, and Red Bull, Racing Bulls and Williams are all
+# blue, so the UI MUST always show the driver code and team label beside the
+# colour and MUST NOT rely on colour alone (docs/spec/UI_DESIGN.md).
+# ui.fallback_palette in config/app.yaml covers any team whose colour is missing.
+#
+# Driver skill ratings are not published anywhere; they are calibration inputs
+# (F20) and are left at the neutral 0.0 shown in the TRD grid schema.
+
+grid_id: real_2026
+teams:
+  - team_id: "red_bull"
+    display_name: "Red Bull"
+    pu_maker: "Red Bull Ford Powertrains"
+    color_hex: "#3671C6" # SOURCE: fastf1 3.8.3 plotting constants (2026)
+    drivers:
+      - driver_id: "VER"
+        code: "VER"
+        display_name: "Max Verstappen"
+        number: 3
+        skill_pace: 0.0 # PLACEHOLDER: calibrate
+        skill_racecraft: 0.0 # PLACEHOLDER: calibrate
+        skill_consistency: 0.0 # PLACEHOLDER: calibrate
+      - driver_id: "HAD"
+        code: "HAD"
+        display_name: "Isack Hadjar"
+        number: 6
+        skill_pace: 0.0 # PLACEHOLDER: calibrate
+        skill_racecraft: 0.0 # PLACEHOLDER: calibrate
+        skill_consistency: 0.0 # PLACEHOLDER: calibrate
+  - team_id: "ferrari"
+    display_name: "Ferrari"
+    pu_maker: "Ferrari"
+    color_hex: "#E80020" # SOURCE: fastf1 3.8.3 plotting constants (2026)
+    drivers:
+      - driver_id: "LEC"
+        code: "LEC"
+        display_name: "Charles Leclerc"
+        number: 16
+        skill_pace: 0.0 # PLACEHOLDER: calibrate
+        skill_racecraft: 0.0 # PLACEHOLDER: calibrate
+        skill_consistency: 0.0 # PLACEHOLDER: calibrate
+      - driver_id: "HAM"
+        code: "HAM"
+        display_name: "Lewis Hamilton"
+        number: 44
+        skill_pace: 0.0 # PLACEHOLDER: calibrate
+        skill_racecraft: 0.0 # PLACEHOLDER: calibrate
+        skill_consistency: 0.0 # PLACEHOLDER: calibrate
+  - team_id: "mercedes"
+    display_name: "Mercedes"
+    pu_maker: "Mercedes"
+    color_hex: "#27F4D2" # SOURCE: fastf1 3.8.3 plotting constants (2026)
+    drivers:
+      - driver_id: "ANT"
+        code: "ANT"
+        display_name: "Andrea Kimi Antonelli"
+        number: 12
+        skill_pace: 0.0 # PLACEHOLDER: calibrate
+        skill_racecraft: 0.0 # PLACEHOLDER: calibrate
+        skill_consistency: 0.0 # PLACEHOLDER: calibrate
+      - driver_id: "RUS"
+        code: "RUS"
+        display_name: "George Russell"
+        number: 63
+        skill_pace: 0.0 # PLACEHOLDER: calibrate
+        skill_racecraft: 0.0 # PLACEHOLDER: calibrate
+        skill_consistency: 0.0 # PLACEHOLDER: calibrate
+  - team_id: "mclaren"
+    display_name: "McLaren"
+    pu_maker: "Mercedes"
+    color_hex: "#FF8000" # SOURCE: fastf1 3.8.3 plotting constants (2026)
+    drivers:
+      - driver_id: "NOR"
+        code: "NOR"
+        display_name: "Lando Norris"
+        number: 1
+        skill_pace: 0.0 # PLACEHOLDER: calibrate
+        skill_racecraft: 0.0 # PLACEHOLDER: calibrate
+        skill_consistency: 0.0 # PLACEHOLDER: calibrate
+      - driver_id: "PIA"
+        code: "PIA"
+        display_name: "Oscar Piastri"
+        number: 81
+        skill_pace: 0.0 # PLACEHOLDER: calibrate
+        skill_racecraft: 0.0 # PLACEHOLDER: calibrate
+        skill_consistency: 0.0 # PLACEHOLDER: calibrate
+  - team_id: "rb"
+    display_name: "RB F1 Team"
+    pu_maker: "Red Bull Ford Powertrains"
+    color_hex: "#6692FF" # SOURCE: fastf1 3.8.3 plotting constants (2026)
+    drivers:
+      - driver_id: "LAW"
+        code: "LAW"
+        display_name: "Liam Lawson"
+        number: 30
+        skill_pace: 0.0 # PLACEHOLDER: calibrate
+        skill_racecraft: 0.0 # PLACEHOLDER: calibrate
+        skill_consistency: 0.0 # PLACEHOLDER: calibrate
+      - driver_id: "LIN"
+        code: "LIN"
+        display_name: "Arvid Lindblad"
+        number: 41
+        skill_pace: 0.0 # PLACEHOLDER: calibrate
+        skill_racecraft: 0.0 # PLACEHOLDER: calibrate
+        skill_consistency: 0.0 # PLACEHOLDER: calibrate
+  - team_id: "audi"
+    display_name: "Audi"
+    pu_maker: "Audi"
+    color_hex: "#FF2D00" # SOURCE: fastf1 3.8.3 plotting constants (2026)
+    drivers:
+      - driver_id: "HUL"
+        code: "HUL"
+        display_name: "Nico Hülkenberg"
+        number: 27
+        skill_pace: 0.0 # PLACEHOLDER: calibrate
+        skill_racecraft: 0.0 # PLACEHOLDER: calibrate
+        skill_consistency: 0.0 # PLACEHOLDER: calibrate
+      - driver_id: "BOR"
+        code: "BOR"
+        display_name: "Gabriel Bortoleto"
+        number: 5
+        skill_pace: 0.0 # PLACEHOLDER: calibrate
+        skill_racecraft: 0.0 # PLACEHOLDER: calibrate
+        skill_consistency: 0.0 # PLACEHOLDER: calibrate
+  - team_id: "alpine"
+    display_name: "Alpine F1 Team"
+    pu_maker: "Mercedes"
+    color_hex: "#0093CC" # SOURCE: fastf1 3.8.3 plotting constants (2026)
+    drivers:
+      - driver_id: "GAS"
+        code: "GAS"
+        display_name: "Pierre Gasly"
+        number: 10
+        skill_pace: 0.0 # PLACEHOLDER: calibrate
+        skill_racecraft: 0.0 # PLACEHOLDER: calibrate
+        skill_consistency: 0.0 # PLACEHOLDER: calibrate
+      - driver_id: "COL"
+        code: "COL"
+        display_name: "Franco Colapinto"
+        number: 43
+        skill_pace: 0.0 # PLACEHOLDER: calibrate
+        skill_racecraft: 0.0 # PLACEHOLDER: calibrate
+        skill_consistency: 0.0 # PLACEHOLDER: calibrate
+  - team_id: "haas"
+    display_name: "Haas F1 Team"
+    pu_maker: "Ferrari"
+    color_hex: "#B6BABD" # SOURCE: fastf1 3.8.3 plotting constants (2026)
+    drivers:
+      - driver_id: "BEA"
+        code: "BEA"
+        display_name: "Oliver Bearman"
+        number: 87
+        skill_pace: 0.0 # PLACEHOLDER: calibrate
+        skill_racecraft: 0.0 # PLACEHOLDER: calibrate
+        skill_consistency: 0.0 # PLACEHOLDER: calibrate
+      - driver_id: "OCO"
+        code: "OCO"
+        display_name: "Esteban Ocon"
+        number: 31
+        skill_pace: 0.0 # PLACEHOLDER: calibrate
+        skill_racecraft: 0.0 # PLACEHOLDER: calibrate
+        skill_consistency: 0.0 # PLACEHOLDER: calibrate
+  - team_id: "williams"
+    display_name: "Williams"
+    pu_maker: "Mercedes"
+    color_hex: "#64C4FF" # SOURCE: fastf1 3.8.3 plotting constants (2026)
+    drivers:
+      - driver_id: "SAI"
+        code: "SAI"
+        display_name: "Carlos Sainz"
+        number: 55
+        skill_pace: 0.0 # PLACEHOLDER: calibrate
+        skill_racecraft: 0.0 # PLACEHOLDER: calibrate
+        skill_consistency: 0.0 # PLACEHOLDER: calibrate
+      - driver_id: "ALB"
+        code: "ALB"
+        display_name: "Alexander Albon"
+        number: 23
+        skill_pace: 0.0 # PLACEHOLDER: calibrate
+        skill_racecraft: 0.0 # PLACEHOLDER: calibrate
+        skill_consistency: 0.0 # PLACEHOLDER: calibrate
+  - team_id: "aston_martin"
+    display_name: "Aston Martin"
+    pu_maker: "Honda"
+    color_hex: "#229971" # SOURCE: fastf1 3.8.3 plotting constants (2026)
+    drivers:
+      - driver_id: "ALO"
+        code: "ALO"
+        display_name: "Fernando Alonso"
+        number: 14
+        skill_pace: 0.0 # PLACEHOLDER: calibrate
+        skill_racecraft: 0.0 # PLACEHOLDER: calibrate
+        skill_consistency: 0.0 # PLACEHOLDER: calibrate
+      - driver_id: "STR"
+        code: "STR"
+        display_name: "Lance Stroll"
+        number: 18
+        skill_pace: 0.0 # PLACEHOLDER: calibrate
+        skill_racecraft: 0.0 # PLACEHOLDER: calibrate
+        skill_consistency: 0.0 # PLACEHOLDER: calibrate
+  - team_id: "cadillac"
+    display_name: "Cadillac F1 Team"
+    pu_maker: "Ferrari"
+    color_hex: "#444444" # SOURCE: fastf1 3.8.3 plotting constants (2026)
+    drivers:
+      - driver_id: "PER"
+        code: "PER"
+        display_name: "Sergio Pérez"
+        number: 11
+        skill_pace: 0.0 # PLACEHOLDER: calibrate
+        skill_racecraft: 0.0 # PLACEHOLDER: calibrate
+        skill_consistency: 0.0 # PLACEHOLDER: calibrate
+      - driver_id: "BOT"
+        code: "BOT"
+        display_name: "Valtteri Bottas"
+        number: 77
+        skill_pace: 0.0 # PLACEHOLDER: calibrate
+        skill_racecraft: 0.0 # PLACEHOLDER: calibrate
+        skill_consistency: 0.0 # PLACEHOLDER: calibrate

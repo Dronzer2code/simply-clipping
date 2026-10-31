@@ -1,0 +1,54 @@
+# F03 Rule Set: 2026 regulations as raced from the Miami Grand Prix (3 May 2026).
+#
+# Per owner decisions (2026-10-19, rounds 1 and 2): the Miami changes are as
+# recorded in docs/spec/TRD.md RULE SET VALUES (350/250 kW zone caps, 150 kW boost
+# cap, 350 kW super-clip, 7 MJ qualifying recharge, counter reset at formation
+# lap start). Values that existed before Miami with no change announced carry
+# over from 2026_pre_miami, marked "# no Miami change announced". Values docs/spec/TRD.md
+# marks UNRESOLVED stay the literal string UNRESOLVED (HR-09) and MUST NOT be guessed.
+
+rule_set_id: 2026_post_miami
+effective_from: "2026-05-03" # Miami Grand Prix
+
+power:
+  p_ice_max_kw_nominal: 400 # ~400 kW, approximate
+  p_k_max_kw: 350 # reported
+  zone_caps_kw:
+    acceleration_zone: 350 # reported
+    other: 250 # reported
+  boost_net_cap_kw: 150 # 150 kW above power at activation; exact interpretation UNRESOLVED
+  boost_taper_start_kmh: 290 # no Miami change announced
+  boost_taper_end_kmh: 355 # no Miami change announced
+  wet_deploy_max_kw: null # post-Miami wet-race ERS reduction: value not published; owner round 16: null (not applied)
+
+overtake:
+  activation_gap_s: 1.0 # reported
+  taper_start_kmh: 337 # no Miami change announced
+  taper_end_kmh: 355 # no Miami change announced
+  extra_energy_mj_per_lap: 0.5 # no Miami change announced
+
+energy:
+  e_usable_max_mj: 4.0 # ESTIMATE: from Rival Battery Radar spec; verify
+  # Default only (owner decision round 2): config/tracks/<track_id>.yaml MAY
+  # override it, and the Race Setup screen lets the user change it before the
+  # start. 8.5 MJ + 0.5 MJ Overtake extra = 9.0 MJ with Overtake active.
+  harvest_max_mj_per_lap_race: 8.5 # SOURCE: PlanetF1 Miami GP clarification; standard GP value
+  harvest_max_mj_per_lap_quali: 7.0 # reported
+  # No per-lap deploy limit: deployment is bounded by the battery window and the
+  # harvest limit only (owner decision round 2).
+  deploy_max_mj_per_lap: null
+  superclip_power_kw: 350 # reported
+  energy_counter_reset: formation_lap_start # reported
+
+car:
+  # Owner decision round 3 (2026-10-19).
+  min_mass_kg: 768 # SOURCE: GPFans 2026 regs explained ("minimum weight of 768kg, without its fuel")
+
+fuel:
+  max_fuel_energy_flow_mj_per_h: 3000 # SOURCE: PlanetF1 2026 engine regs explained ("3000 MJ (from fuel) per hour")
+
+race:
+  # 3rd offence: black-and-white flag (warning). 4th and every later offence:
+  # 5 s time penalty. Races and sprints only; in qualifying, laps over track
+  # limits are deleted instead.
+  track_limits_warnings_before_penalty: 3 # SOURCE: FIA 2026 penalty guidelines via formulaonehistory.com
