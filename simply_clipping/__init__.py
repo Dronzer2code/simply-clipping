@@ -15,11 +15,20 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pandas as pd
+
 from simply_clipping.alerts import no_alerts
-from simply_clipping.energy import prior_estimates
+from simply_clipping.energy import CarTracker, Estimates, estimates_frame
 from simply_clipping.live import Provider, create
-from simply_clipping.loader import Track, car_inputs, load_config, load_feed, load_layout
-from simply_clipping.physics import aero_modes, fit_cda, stream_car
+from simply_clipping.loader import (
+    Config,
+    Feed,
+    Track,
+    car_inputs,
+    load_config,
+    load_feed,
+    load_layout,
+)
 
 __all__ = ["Provider", "create", "run"]
 
@@ -31,11 +40,24 @@ def run(
     cfg = load_config()
     feed = load_feed(feed_dir)
     track = Track.from_layout(load_layout(layout_file))
-    cda: dict[str, dict[str, float | None]] = {}
-    for driver, car in car_inputs(feed, track.length_m).items():
-        fit = fit_cda(stream_car(car, cfg), track, cfg)
-        cda[driver] = {mode: fit.fitted(mode) for mode in aero_modes(cfg)}
+    trackers, per_car = track_race(feed, track, cfg)
+    cda = {d: {m: tr.fit.fitted(m) for m in tr.modes} for d, tr in trackers.items()}
     (out_dir / "cda_fit.json").write_text(json.dumps(cda, indent=1), encoding="utf-8")
-    prior_estimates(feed.cars, cfg).to_parquet(out_dir / "estimates.parquet", index=False)
+    frames = [estimates_frame(d, est, cfg) for d, est in per_car.items()]
+    pd.concat(frames, ignore_index=True).to_parquet(out_dir / "estimates.parquet", index=False)
     if our is not None:
         no_alerts().to_parquet(out_dir / "alerts.parquet", index=False)
+
+
+def track_race(
+    feed: Feed, track: Track, cfg: Config
+) -> tuple[dict[str, CarTracker], dict[str, Estimates]]:
+    """Every car's tracker after the whole race, and its per-point estimates."""
+    trackers: dict[str, CarTracker] = {}
+    per_car: dict[str, Estimates] = {}
+    for driver, car in car_inputs(feed, track.length_m).items():
+        tracker = CarTracker(driver, car.team, track, cfg)
+        first = tracker.push(car.t_s, car.speed_kmh, car.throttle_pct, car.brake, car.progress_m)
+        per_car[driver] = Estimates.concat([first, tracker.flush()])
+        trackers[driver] = tracker
+    return trackers, per_car

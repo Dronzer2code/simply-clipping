@@ -50,12 +50,17 @@ class Points:
     progress_m: Array
     segment: npt.NDArray[np.int64]
     """Stream segment number (a new one after every long gap)."""
+    window_throttle_pct: Array
+    """Lowest throttle within the point's filter window."""
+    window_brake: Bools
+    """Brake on anywhere within the point's filter window (the smoothed acceleration
+    then mixes in braking: the point is not a steady full-throttle point)."""
 
     @classmethod
     def empty(cls) -> Points:
         """No points."""
-        f = np.zeros(0)
-        return cls(f, f, f, f, np.zeros(0, dtype=bool), f, np.zeros(0, dtype=np.int64))
+        f, b = np.zeros(0), np.zeros(0, dtype=bool)
+        return cls(f, f, f, f, b, f, np.zeros(0, dtype=np.int64), f, b)
 
     def __len__(self) -> int:
         """Return the number of points."""
@@ -73,7 +78,17 @@ class Points:
         return Points(*(getattr(self, f)[idx] for f in FIELDS))
 
 
-FIELDS = ("t_s", "v_ms", "a_ms2", "throttle_pct", "brake", "progress_m", "segment")
+FIELDS = (
+    "t_s",
+    "v_ms",
+    "a_ms2",
+    "throttle_pct",
+    "brake",
+    "progress_m",
+    "segment",
+    "window_throttle_pct",
+    "window_brake",
+)
 
 
 def _dot(coef: Array, windows: list[Array]) -> Array:
@@ -201,20 +216,26 @@ class Stream:
             return Points.empty()
         local = idx - seg.base
         vs, acc = np.empty(idx.size), np.empty(idx.size)
+        wthr, wbrk = np.empty(idx.size), np.empty(idx.size, dtype=bool)
         interior = (idx >= h) & (idx < n_total - h)
         if interior.any():
             li = local[interior]
             windows = [v[li - h + q] for q in range(w)]
             vs[interior] = _dot(self.smooth[h], windows)
             acc[interior] = _dot(self.deriv[h], windows)
+            wthr[interior] = np.min([thr[li - h + q] for q in range(w)], axis=0)
+            wbrk[interior] = np.any([brk[li - h + q] for q in range(w)], axis=0)
         for edge in np.flatnonzero(~interior):
             j = int(idx[edge])
             first = 0 if j < h else n_total - w  # the window the polynomial is fitted on
-            win = [v[np.array([first - seg.base + q])] for q in range(w)]
+            span = np.arange(first - seg.base, first - seg.base + w)
+            win = [v[np.array([span[q]])] for q in range(w)]
             vs[edge] = _dot(self.smooth[j - first], win)[0]
             acc[edge] = _dot(self.deriv[j - first], win)[0]
+            wthr[edge] = thr[span].min()
+            wbrk[edge] = brk[span].any()
         pts = Points(t[local], vs, acc, thr[local], brk[local], prog[local],
-                     np.full(idx.size, seg.number, dtype=np.int64))  # fmt: skip
+                     np.full(idx.size, seg.number, dtype=np.int64), wthr, wbrk)  # fmt: skip
         seg.emitted = stop
         drop = max(0, min(seg.emitted - w, t.size + seg.base - w) - seg.base)
         if drop > 0 and not final:  # keep one window of context
@@ -388,9 +409,10 @@ class RunBuilder:
         bounds = [int(s) for s in starts] + [n]
         if not starts.size or starts[0] != 0:
             bounds = [0, *bounds]
+        start_set = {int(s) for s in starts}
         for a, b in zip(bounds[:-1], bounds[1:], strict=True):
-            if a in starts:  # a new run (or none) begins here
-                self._close(closed)
+            if a in start_set:  # a new run (or none) begins here
+                self._close(closed, float(pts.t_s[a]))
                 if key[a] >= 0:
                     self._key, self._mode, self._zone = (
                         int(key[a]),
@@ -406,13 +428,13 @@ class RunBuilder:
     def close(self) -> list[Run]:
         """End of data: close the open run."""
         closed: list[Run] = []
-        self._close(closed)
+        self._close(closed, np.inf)
         return closed
 
-    def _close(self, closed: list[Run]) -> None:
+    def _close(self, closed: list[Run], at_t: float) -> None:
         if self._parts:
             closed.append(Run(self._mode, Points.concat(self._parts), np.concatenate(self._mass),
-                              self._zone >= 0))  # fmt: skip
+                              self._zone >= 0, at_t))  # fmt: skip
         self._parts, self._mass = [], []
         self._key = self._mode = self._zone = -1
 
@@ -426,6 +448,8 @@ class Run:
     points: Points
     m_kg: Array
     accel_zone: bool
+    closed_t: float
+    """Time of the first point that did not continue the run (inf: end of data)."""
 
 
 def stream_car(car: CarInput, cfg: Config) -> Points:

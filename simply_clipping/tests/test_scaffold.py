@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import re
 from pathlib import Path
+from types import SimpleNamespace
 
 import numpy as np
 import pandas as pd
@@ -96,5 +97,8 @@ def test_package_never_names_the_answer_sheet() -> None:
 
 
 def test_live_provider_returns_alerts() -> None:
-    provider = simply_clipping.create(cfg=None, track={"zones": [], "corners": []})
-    assert provider.update(view=None) == []
+    track = {"track_id": "t", "length_m": 1000.0, "zones": [], "corners": []}
+    provider = simply_clipping.create(cfg=None, track=track)
+    our_car = SimpleNamespace(driver_id="US", lap=1, s_m=10.0, v_ms=50.0, battery_mj=3.0,
+                              throttle=1.0, brake=0.0)  # fmt: skip
+    assert provider.update(SimpleNamespace(t_s=5.0, our_car=our_car, rival_feed={})) == []

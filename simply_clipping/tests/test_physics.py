@@ -9,6 +9,7 @@ import pytest
 
 from simply_clipping.loader import Config, const, load_config, segment_ids
 from simply_clipping.physics import (
+    FIELDS,
     CdaFit,
     Points,
     RunBuilder,
@@ -52,8 +53,7 @@ def _raw(rng: np.random.Generator, t_end: float) -> tuple[np.ndarray, ...]:
 
 
 def _fields_equal(a: Points, b: Points) -> bool:
-    fields = ("t_s", "v_ms", "a_ms2", "throttle_pct", "brake", "progress_m", "segment")
-    return all(np.array_equal(getattr(a, f), getattr(b, f)) for f in fields)
+    return all(np.array_equal(getattr(a, f), getattr(b, f)) for f in FIELDS)
 
 
 def test_stream_is_chunk_invariant() -> None:

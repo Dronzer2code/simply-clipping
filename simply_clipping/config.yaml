@@ -21,6 +21,10 @@ car:
   p_ice_kw: 400.0 # RADAR default ICE power
   p_ice_kw_by_team: {} # TUNE (SC-1), lesson L-d: team_id -> kW, fitted on seeds 1-5 from public data
   p_elec_max_kw: 350.0 # RULES MGU-K maximum
+  p_ice_from_runs: false # TUNE (SC-2), lesson L-d: ICE power per car from its strongest acceleration-zone runs
+  p_ice_quantile: 0.9 # TUNE (SC-2): the run power taken as full deploy
+  p_ice_min_runs: 10 # STRUCTURAL: runs needed before the per-car ICE replaces p_ice_kw
+  p_ice_spread_pct: 5.0 # STRUCTURAL: per-car ICE stays within this of p_ice_kw
 
 fuel: # lesson L-d: mass falls over the race (linear burn, a full race distance)
   start_kg: 90.0 # TUNE (SC-1): best CdA fit on seeds 1-5 among 90 / 110 / 130 kg
@@ -38,6 +42,7 @@ states: # RADAR / BRIDGE state definitions (the scorer's state_true uses the sam
   deploy_min_kw: 150
   clip_max_kw: 50
   clip_max_accel_ms2: 0.3 # "speed flat or falling"
+  taper_margin_kw: 120.0 # TUNE (SC-2), lesson L-b: in the taper band CLIP needs this much less than the taper allows
   partial_deploy_kw: [150, 250] # lesson L-c: deploy levels seen on straights (SPRINT Part 5 partial_deploy)
 
 cda_fit: # SC-1: per car per aero mode from full-throttle runs, no deploy assumption (lesson L-c)
@@ -60,21 +65,51 @@ cda_fit: # SC-1: per car per aero mode from full-throttle runs, no deploy assump
 energy:
   e_min_mj: 0.0 # RADAR clamp
   e_max_mj: 4.0 # RADAR clamp
-  prior_mj: 2.0 # scaffold output until SC-4 (half of e_max_mj)
-  prior_confidence: 0.1 # scaffold output until SC-4
+  harvest_cap_kw: 350.0 # owner SC-2: harvest (braking, super-clip, lift) capped at the MGU-K maximum
+  brake_share: 0.55 # TUNE (SC-2): share of the braking power the MGU-K recovers (before the cap)
+  lift_harvest_kw: 140.0 # TUNE (SC-2): harvest while lifting (throttle below lift_throttle_pct, no brake)
+  superclip_min_kmh: 250.0 # TUNE (SC-2): a super-clip is at speed on a straight
+  harvest_max_mj_per_lap: 8.5 # RULES race harvest limit per lap
+
+deploy: # SC-2, lesson L-c: the deploy level the car shows, carried where the speed trace cannot show it
+  observed_kmh: {min: 200.0, max: 290.0} # TUNE (SC-2): on a straight in this band P_elec shows the deploy level
+  level_tau_s: 20.0 # TUNE (SC-2): memory of the car's straight-line deploy level
+  start_level_kw: 250.0 # TUNE (SC-2): that level before the first observation
+  corner_min_kmh: 150.0 # TUNE (SC-2): fast corners tell a car that deploys in corners (PUSH) ...
+  corner_seen_kw: 120.0 # TUNE (SC-2): ... by P_elec above this at full throttle (deploying: median ~+226 kW, not: ~+7 +- 40)
+  corner_tau_s: 30.0 # TUNE (SC-2): memory of that
+  corner_cap_kw: 250.0 # RULES post-Miami MGU-K cap outside acceleration zones
+  cruise_scale: 0.3 # TUNE (SC-2): part-throttle deploy read from P_elec times this
 
 anchor: # lesson L-a: a super-clip is not an empty battery
-  min_clip_s: 1.0 # a CLIP shorter than this is partial deployment, not a clip (sim sprint day 5)
-  min_straight_m: null # TUNE (SC-4)
-  clip_energy_mj: null # TUNE (SC-4): energy left when a car clips; NOT 0
+  start_mj: 4.0 # owner SC-2: race start prior ~full
+  min_straight_m: 600.0 # RADAR: a long straight is > 600 m (acceleration zones SM1, SM2 at Suzuka)
+  max_start_frac: 0.5 # TUNE (SC-2): an empty car stops deploying in the first half of the straight
+  min_clip_s: 2.0 # TUNE (SC-2): ... for this long
+  no_deploy_kw: 60.0 # TUNE (SC-2): ... at full throttle with P_elec below this (no deploy)
+  superclip_kw: -150.0 # TUNE (SC-2): ... and above this (no harvest: a super-clip harvests ~-350 kW)
+  empty_mj: 0.1 # TUNE (SC-2): energy left after an EMPTY anchor (~0)
 
 confidence: # lesson L-e: 0.8 confidence must be right ~80 % of the time
-  half_life_s: null # TUNE (SC-4)
-  right_tol_mj: 0.5 # OPEN O-1 (owner): proposed meaning of "right" for the reliability check
-  calibration: [] # TUNE (SC-4 / SC-7): reliability table fitted on seeds 1-5
+  missing_tau_s: 30.0 # STRUCTURAL: missing data is forgotten with this time constant
+  missing_scale_s: 5.0 # STRUCTURAL: confidence falls by 1/e per this much recent missing data
+  right_tol_mj: 0.5 # OPEN O-1 (owner): "right" = within 0.5 MJ of the true battery
+  table: # TUNE (SC-2): hit rate (within right_tol_mj) per estimate band x time since the last anchor, seeds 1-5
+    energy_edges_mj: [0.0, 0.2, 1.0, 2.0, 3.0, 3.8, 3.99, 4.0]
+    since_anchor_edges_s: [0.0, 120.0, 300.0, 600.0, 1200.0] # the last band is open-ended
+    hit_rate: # rows: estimate bands; columns: time-since-anchor bands
+      - [0.872, 0.505, 0.787, 0.87, 0.87]  # estimate 0.0-0.2 MJ
+      - [0.579, 0.42, 0.566, 0.518, 0.684]  # estimate 0.2-1.0 MJ
+      - [0.191, 0.348, 0.441, 0.626, 0.616]  # estimate 1.0-2.0 MJ
+      - [0.206, 0.387, 0.58, 0.727, 0.679]  # estimate 2.0-3.0 MJ
+      - [0.329, 0.482, 0.526, 0.653, 0.629]  # estimate 3.0-3.8 MJ
+      - [0.406, 0.523, 0.536, 0.683, 0.654]  # estimate 3.8-3.99 MJ
+      - [0.373, 0.697, 0.798, 0.873, 0.837]  # estimate 3.99-4.0 MJ
 
 battles:
   within_s: 1.0 # RADAR
+  stale_s: 2.0 # STRUCTURAL: a rival estimate older than this is not used
+  min_speed_kmh: 40.0 # STRUCTURAL: floor of the speed a gap is divided by
 
 alerts: # RADAR / SPRINT Part 2
   attack_gap_s: 1.0
@@ -86,9 +121,17 @@ alerts: # RADAR / SPRINT Part 2
   repass_straight_m: 600.0
   closing_dv_kmh: 40.0
   closing_range_m: 200.0
-  closing_episode_gap_s: null # TUNE (SC-6), lesson L-f: one alert per episode
+  closing_episode_gap_s: 5.0 # TUNE (SC-3), lesson L-f: an episode ends after this long without a closing pair
   suppress_laps: 1
   expires_s: 8.0
+  min_confidence: 0.4 # owner SC-3: energy branches need this rival confidence
+  long_clip_s: 1.0 # TUNE (SC-3): a "long CLIP" on a straight (single CLIP points are noise)
+  detection_min_share: 0.7 # TUNE (SC-3): observed-clip branches need this share of samples on the pass
+  need_share: 1.0 # TUNE (SC-3): DEFEND own battery: our battery below this share of the straight's need
+  tick_s: 0.5 # STRUCTURAL: the rules are evaluated every this many seconds (bench and pit wall alike)
+  latency_s: 1.0 # STRUCTURAL: live, a tick is evaluated this long after it (smoothing needs 0.3 s ahead)
+  own_rate_s: 1.0 # STRUCTURAL: our deploy / acceleration from our own data over this window
+  history_s: 600.0 # STRUCTURAL: live, each car keeps this much history (a lap is ~110 s)
 
 output:
   estimates_hz: 1.0 # BRIDGE: once a second per car is plenty
