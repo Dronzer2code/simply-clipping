@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>__TITLE__</title>
+<script src="lib/vis-network.min.js"></script>
+<style>
+  :root {
+    --bg: #0f0f1a; --panel: #1a1a2e; --border: #2a2a4e; --input-border: #3a3a5e;
+    --text: #e0e0e0; --text-2: #aaa; --text-3: #ccc; --muted: #666; --accent: #4E79A7;
+    --good: #59A14F; --bad: #E15759;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; display: flex; height: 100vh; overflow: hidden; }
+  #graph { flex: 1; position: relative; }
+  #title { position: absolute; top: 10px; left: 14px; font-size: 13px; color: var(--text-2); z-index: 2; pointer-events: none; }
+  #title b { color: var(--text); }
+  #sidebar { width: 320px; background: var(--panel); border-left: 1px solid var(--border); display: flex; flex-direction: column; overflow: hidden; }
+  #links { display: flex; gap: 6px; padding: 10px 12px; border-bottom: 1px solid var(--border); }
+  #links a { flex: 1; text-align: center; background: var(--bg); color: var(--text-2); border: 1px solid var(--input-border); border-radius: 4px; padding: 4px 0; font-size: 12px; text-decoration: none; }
+  #links a:hover { color: var(--text); border-color: var(--accent); }
+  #search-wrap { padding: 12px; border-bottom: 1px solid var(--border); }
+  #search { width: 100%; background: var(--bg); border: 1px solid var(--input-border); color: var(--text); padding: 7px 10px; border-radius: 6px; font-size: 13px; outline: none; }
+  #search:focus { border-color: var(--accent); }
+  #search-results { max-height: 140px; overflow-y: auto; padding: 4px 12px; border-bottom: 1px solid var(--border); display: none; }
+  .search-item { padding: 4px 6px; cursor: pointer; border-radius: 4px; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .search-item:hover { background: var(--border); }
+  #info-panel { padding: 14px; border-bottom: 1px solid var(--border); min-height: 140px; max-height: 52vh; overflow-y: auto; }
+  h3 { font-size: 13px; color: var(--text-2); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.05em; }
+  #info-content { font-size: 13px; color: var(--text-3); line-height: 1.55; }
+  #info-content .field { margin-bottom: 4px; }
+  #info-content .field b { color: var(--text); }
+  #info-content .empty { color: var(--muted); font-style: italic; }
+  #info-content table { width: 100%; border-collapse: collapse; margin: 6px 0; font-size: 12px; }
+  #info-content td { padding: 2px 4px; border-bottom: 1px solid var(--border); }
+  #info-content td:last-child { text-align: right; color: var(--text); }
+  .good { color: var(--good) !important; } .bad { color: var(--bad) !important; }
+  .neighbor-link { display: block; padding: 2px 6px; margin: 2px 0; border-radius: 3px; cursor: pointer; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; border-left: 3px solid #333; }
+  .neighbor-link:hover { background: var(--border); }
+  .neighbor-link i { color: var(--muted); font-style: normal; }
+  #legend-wrap { flex: 1; overflow-y: auto; padding: 12px; }
+  .legend-item { display: flex; align-items: center; gap: 8px; padding: 4px 0; cursor: pointer; border-radius: 4px; font-size: 12px; }
+  .legend-item:hover { background: var(--border); }
+  .legend-item.dimmed { opacity: 0.35; }
+  .legend-dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
+  .legend-label { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .legend-count { color: var(--muted); font-size: 11px; }
+  #types { display: flex; flex-wrap: wrap; gap: 4px 10px; margin-bottom: 12px; font-size: 12px; color: var(--text-2); }
+  #types label { display: flex; align-items: center; gap: 4px; cursor: pointer; }
+  #stats { padding: 10px 14px; border-top: 1px solid var(--border); font-size: 11px; color: var(--muted); }
+</style>
+</head>
+<body>
+<div id="graph"><div id="title"></div></div>
+<div id="sidebar">
+  <div id="links"><a href="dashboard.html">Race dashboard</a><a href="race_report.md">Race report</a></div>
+  <div id="search-wrap">
+    <input id="search" type="text" placeholder="Search nodes (e.g. OCO, ATTACK, Radio)..." autocomplete="off">
+    <div id="search-results"></div>
+  </div>
+  <div id="info-panel">
+    <h3>Node info</h3>
+    <div id="info-content"><span class="empty">Click a node to inspect it</span></div>
+  </div>
+  <div id="legend-wrap">
+    <h3>Show</h3>
+    <div id="types"></div>
+    <h3>Battle groups</h3>
+    <div id="legend"></div>
+  </div>
+  <div id="stats"></div>
+</div>
+<script>
+const DATA = /*__DATA__*/null;
+const G = DATA.graph, RACE = G.graph.race, COLOURS = DATA.colours;
+const SHAPES = { car: 'dot', battle: 'ellipse', alert: 'triangle', truthcheck: 'star', outcome: 'diamond',
+                 call: 'square', callcost: 'box', incident: 'hexagon' };
+const TYPE_NAMES = { car: 'Cars', battle: 'Battles', alert: 'Alerts', truthcheck: 'Truth checks', outcome: 'Outcomes',
+                     call: 'Calls', callcost: 'Call costs', incident: 'Incidents' };
+const STAT_NAMES = {
+  time_within_1s_s: ['Time within 1 s of you', v => v + ' s'], battles: ['Battles with you', v => v],
+  passes_made: ['Passes you made on them', v => v], passes_lost: ['Passes they made on you', v => v],
+  alerts: ['Alerts about them', v => Object.keys(v).length ? Object.entries(v).map(([k, n]) => n + ' ' + k.replace('_', ' ')).join(', ') : '0'],
+  alerts_right_pct: ['Alerts right (truth)', (v, s) => v === null ? '-' : v + ' % (' + s.alerts_right + '/' + s.alerts_judged + ')'],
+  radar_mae_mj: ['Radar MAE on them', v => v === null ? '-' : v.toFixed(2) + ' MJ'],
+  est_minus_true_mj: ['Mean estimate - true', v => v === null ? '-' : (v > 0 ? '+' : '') + v.toFixed(2) + ' MJ'],
+  calls: ['Calls about them', v => v], call_cost_s: ['Total call cost', v => v === null ? '-' : (v > 0 ? '+' : '') + v.toFixed(1) + ' s'],
+  max_closing_kmh: ['Max closing speed', v => v === null ? '-' : v.toFixed(0) + ' km/h'],
+  lap_delta_s: ['Avg lap time vs you', v => v === null ? '-' : (v > 0 ? '+' : '') + v.toFixed(2) + ' s'],
+  alerts_judged: null, alerts_right: null,
+};
+const TOTAL_NAMES = {
+  finish_position: ['Finish', v => v ? 'P' + v : '-'], alerts: ['Alerts', v => v], calls_made: ['Calls made', v => v],
+  passes_made: ['Passes made', v => v], passes_lost: ['Passes lost', v => v],
+  total_call_cost_s: ['Total call cost', v => v === null ? '-' : (v > 0 ? '+' : '') + v.toFixed(1) + ' s'],
+  radar_mae_mj: ['Radar MAE (all rivals)', v => v === null ? '-' : v.toFixed(2) + ' MJ'],
+  alerts_right: ['Alerts right (truth)', (v, s) => s.alerts_judged ? v + '/' + s.alerts_judged : '-'],
+  alerts_judged: null, calls_costed: null,
+};
+const SKIP = new Set(['id', 'label', 'file_type', 'source_file', 'source_location', 'community', 'community_name',
+                      'stats', 'color', 'our_car', 'x', 'y']);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const ourNode = G.nodes.find(n => n.our_car);
+const deg = {};
+G.links.forEach(l => { deg[l.source] = (deg[l.source] || 0) + 1; deg[l.target] = (deg[l.target] || 0) + 1; });
+
+function nodeStyle(n) {
+  const kind = n.file_type, comm = COLOURS[n.community] || '#888';
+  if (kind === 'car') {
+    const us = !!n.our_car, team = n.color || '#888';
+    return { label: us ? n.label + ' (YOU)' : n.label, shape: 'dot', size: us ? 34 : 14 + Math.min(14, Math.sqrt((n.stats && n.stats.time_within_1s_s) || 0)),
+             color: { background: team, border: us ? '#ffffff' : comm, highlight: { background: '#fff', border: team } },
+             borderWidth: us ? 4 : 3, font: { size: us ? 18 : 13, color: '#fff', strokeWidth: 3, strokeColor: '#0f0f1a', bold: us } ,
+             x: us ? 0 : undefined, y: us ? 0 : undefined, fixed: us ? { x: true, y: true } : false, mass: us ? 6 : 2 };
+  }
+  let bg = comm;
+  if (kind === 'truthcheck') bg = n.right === true ? '#59A14F' : n.right === false ? '#E15759' : '#888';
+  if (kind === 'callcost') bg = n.delta_s <= 0.05 ? '#59A14F' : '#E15759';
+  return { label: n.label, shape: SHAPES[kind] || 'dot', size: kind === 'battle' ? 8 : 11,
+           color: { background: bg, border: comm, highlight: { background: '#fff', border: comm } },
+           font: { size: 10, color: '#cfcfdf', strokeWidth: 2, strokeColor: '#0f0f1a' },
+           shapeProperties: { borderRadius: 3 } };
+}
+const nodesDS = new vis.DataSet(G.nodes.map(n => Object.assign({ id: n.id, raw: n, group: n.community, title: n.label }, nodeStyle(n))));
+const edgesDS = new vis.DataSet(G.links.map((l, i) => {
+  const battle = l.relation === 'battled', pass = l.relation === 'passed', inferred = l.confidence === 'INFERRED';
+  return { id: 'e' + i, from: l.source, to: l.target, raw: l, title: l.relation + (battle ? ' ' + l.seconds + ' s' : pass ? ' x' + l.count : '') + ' [' + l.confidence + (inferred ? ' ' + l.confidence_score : '') + ']',
+           width: battle ? 1 + Math.log1p(l.weight) : pass ? 1.5 + l.weight : 1, dashes: inferred,
+           arrows: battle ? '' : { to: { enabled: true, scaleFactor: 0.45 } },
+           color: { color: battle ? '#8f8fb8' : pass ? '#F28E2B' : '#4a4a6e', opacity: battle ? 0.8 : 0.6, highlight: '#ffffff' },
+           smooth: { type: 'continuous' }, length: battle ? 120 + 400 / (1 + l.weight / 20) : 70 };
+}));
+const container = document.getElementById('graph');
+const network = new vis.Network(container, { nodes: nodesDS, edges: edgesDS }, {
+  physics: { solver: 'forceAtlas2Based', forceAtlas2Based: { gravitationalConstant: -60, centralGravity: 0.006, springLength: 90, springConstant: 0.06, avoidOverlap: 0.4 },
+             stabilization: { iterations: 400 } },
+  interaction: { hover: true, tooltipDelay: 120, hideEdgesOnDrag: true }, layout: { improvedLayout: G.nodes.length < 400 },
+});
+network.once('stabilizationIterationsDone', () => { network.setOptions({ physics: { enabled: false } }); network.fit({ animation: false }); });
+
+document.getElementById('title').innerHTML = '<b>' + esc(ourNode ? ourNode.label : RACE.our) + '</b> vs every rival &middot; ' +
+  esc(RACE.track_id) + ' &middot; seed ' + RACE.seed + ' &middot; ' + RACE.laps + ' laps' + (RACE.test_mode ? ' &middot; test mode' : '');
+
+function statRows(stats, names) {
+  return '<table>' + Object.entries(stats).filter(([k]) => names[k] !== null).map(([k, v]) => {
+    const spec = names[k] || [k, x => x === null ? '-' : x];
+    let cls = '';
+    if (k === 'call_cost_s' || k === 'total_call_cost_s') cls = v === null ? '' : v > 0.05 ? 'bad' : 'good';
+    return '<tr><td>' + esc(spec[0]) + '</td><td class="' + cls + '">' + esc(spec[1](v, stats)) + '</td></tr>';
+  }).join('') + '</table>';
+}
+function showInfo(id) {
+  const node = nodesDS.get(id); if (!node) return;
+  const n = node.raw;
+  let html = '<div class="field"><b>' + esc(node.label) + '</b></div>';
+  html += '<div class="field">Type: ' + esc(n.file_type) + ' &middot; ' + esc(n.source_location) + '</div>';
+  html += '<div class="field">Battle group: ' + esc(n.community_name) + '</div>';
+  if (n.file_type === 'car') {
+    html += '<div class="field">' + esc(n.team || '') + (n.status && n.status !== 'FINISHED' ? ' &middot; ' + esc(n.status) : '') + '</div>';
+    if (n.stats) html += n.our_car ? statRows(n.stats, TOTAL_NAMES) : statRows(n.stats, STAT_NAMES);
+  } else {
+    const rows = Object.entries(n).filter(([k, v]) => !SKIP.has(k) && v !== null && v !== undefined);
+    if (rows.length) html += '<table>' + rows.map(([k, v]) => '<tr><td>' + esc(k.replace(/_/g, ' ')) + '</td><td class="' +
+      (k === 'right' ? (v ? 'good' : 'bad') : '') + '">' + esc(typeof v === 'object' ? JSON.stringify(v) : v) + '</td></tr>').join('') + '</table>';
+  }
+  const conn = edgesDS.get({ filter: e => e.from === id || e.to === id });
+  if (conn.length) {
+    html += '<div class="field" style="margin-top:8px;color:var(--text-2);font-size:11px">Connections (' + conn.length + ')</div><div>';
+    conn.sort((a, b) => (b.raw.weight || 0) - (a.raw.weight || 0)).forEach(e => {
+      const other = e.from === id ? e.to : e.from, nb = nodesDS.get(other); if (!nb) return;
+      const arrow = e.raw.relation === 'battled' ? '&harr;' : e.from === id ? '&rarr;' : '&larr;';
+      const extra = e.raw.relation === 'battled' ? ' ' + e.raw.seconds + ' s' : e.raw.relation === 'passed' ? ' x' + e.raw.count : '';
+      html += '<span class="neighbor-link" style="border-left-color:' + esc(nb.color.background) + '" data-nid="' + esc(other) + '"><i>' +
+        arrow + ' ' + esc(e.raw.relation + extra) + '</i> ' + esc(nb.label) + '</span>';
+    });
+    html += '</div>';
+  }
+  const box = document.getElementById('info-content');
+  box.innerHTML = html;
+  box.querySelectorAll('.neighbor-link').forEach(el => el.onclick = () => focusNode(el.dataset.nid));
+}
+function focusNode(id) { network.selectNodes([id]); network.focus(id, { scale: 1.1, animation: true }); showInfo(id); }
+network.on('click', p => { if (p.nodes.length) showInfo(p.nodes[0]); });
+
+const search = document.getElementById('search'), results = document.getElementById('search-results');
+search.addEventListener('input', () => {
+  const q = search.value.trim().toLowerCase();
+  if (!q) { results.style.display = 'none'; return; }
+  const hits = G.nodes.filter(n => n.label.toLowerCase().includes(q)).slice(0, 30);
+  results.innerHTML = hits.map(n => '<div class="search-item" data-nid="' + esc(n.id) + '">' + esc(n.label) + '</div>').join('') || '<div class="search-item">no match</div>';
+  results.style.display = 'block';
+  results.querySelectorAll('[data-nid]').forEach(el => el.onclick = () => { focusNode(el.dataset.nid); results.style.display = 'none'; });
+});
+
+const hiddenComm = new Set(), hiddenType = new Set();
+function applyFilters() {
+  nodesDS.update(G.nodes.map(n => ({ id: n.id, hidden: !n.our_car && (hiddenComm.has(n.community) || hiddenType.has(n.file_type)) })));
+}
+const counts = {}, typeCounts = {};
+G.nodes.forEach(n => { counts[n.community] = (counts[n.community] || 0) + 1; typeCounts[n.file_type] = (typeCounts[n.file_type] || 0) + 1; });
+document.getElementById('types').innerHTML = Object.keys(TYPE_NAMES).filter(t => typeCounts[t]).map(t =>
+  '<label><input type="checkbox" data-type="' + t + '" checked>' + TYPE_NAMES[t] + ' (' + typeCounts[t] + ')</label>').join('');
+document.querySelectorAll('#types input').forEach(cb => cb.onchange = () => {
+  cb.checked ? hiddenType.delete(cb.dataset.type) : hiddenType.add(cb.dataset.type); applyFilters(); });
+const comms = G.graph.communities;
+document.getElementById('legend').innerHTML = Object.keys(comms).map(c =>
+  '<div class="legend-item" data-c="' + c + '"><span class="legend-dot" style="background:' + (COLOURS[c] || '#888') + '"></span><span class="legend-label">' +
+  esc(comms[c]) + '</span><span class="legend-count">' + (counts[c] || 0) + '</span></div>').join('');
+document.querySelectorAll('.legend-item').forEach(el => el.onclick = () => {
+  const c = Number(el.dataset.c);
+  hiddenComm.has(c) ? hiddenComm.delete(c) : hiddenComm.add(c); el.classList.toggle('dimmed'); applyFilters(); });
+document.getElementById('stats').innerHTML = G.nodes.length + ' nodes &middot; ' + G.links.length + ' edges &middot; ' +
+  Object.keys(comms).length + ' communities &middot; built after the flag';
+if (ourNode) showInfo(ourNode.id);
+</script>
+</body>
+</html>

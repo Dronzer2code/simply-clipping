@@ -37,7 +37,7 @@ from pitwall_sim.live.costs import CallSpec, call_cost, describe
 from pitwall_sim.live.driver_radio import DriverRadio
 from pitwall_sim.live.presets import Preset
 from pitwall_sim.live.radio_ai import RadioAI
-from pitwall_sim.live.reveal import RevealData, RevealRecorder
+from pitwall_sim.live.reveal import RevealData, RevealRecorder, RevealSamples
 from pitwall_sim.live.strategy import PublicInfo, StrategyWorker, plans_for
 from pitwall_sim.observe.alerts import Alert, make_provider
 from pitwall_sim.observe.engineer_view import EngineerView, EngineerViewBuilder
@@ -298,7 +298,7 @@ class LiveSession:
     def _after_tick(self) -> None:
         self._view = view = self._builder.build()
         if not self._race_over:  # the Reveal plots end at the flag, not the cool-down
-            self._reveal.sample(view, self._truth_mj())
+            self._reveal.sample(view, self._truth_mj(), self._speed_kmh())
         self._reveal.after(view, self.engine.finished)
         self._strategy_upkeep(view)
         if not self.engine.finished and (said := self._driver_radio.update(view)):
@@ -504,6 +504,9 @@ class LiveSession:
                 record.correct = diff >= margin
         self._records[alert.alert_id] = record
         self.calls.append(record)
+        i = self.engine.driver_ids.index(alert.rival)  # kept in the recorder until the flag
+        self._reveal.on_alert(alert.alert_id, float(self.engine.st.battery_j[i]) / MJ,
+                              view.our_car.battery_mj)  # fmt: skip
 
     def _judge(self, view: EngineerView) -> None:
         """Score each alert ``OUTCOME_LAPS`` of Our Car after it fired."""
@@ -584,6 +587,11 @@ class LiveSession:
         return {d: float(self.engine.st.battery_j[i]) / MJ
                 for i, d in enumerate(self.engine.driver_ids)}  # fmt: skip
 
+    def _speed_kmh(self) -> dict[str, float]:
+        """Every car's TRUE speed: for the Reveal recorder only (race graphs, after the flag)."""
+        return {d: float(self.engine.st.v_ms[i]) * 3.6
+                for i, d in enumerate(self.engine.driver_ids)}  # fmt: skip
+
     def _strategy_upkeep(self, view: EngineerView) -> None:
         """Strategy panel (H5): a refresh at each of Our Car's laps; results into the view."""
         worker = self._strategy
@@ -648,6 +656,13 @@ class LiveSession:
             if not self.engine.finished:
                 return None
             return self._reveal.reveal()
+
+    def reveal_samples(self) -> RevealSamples | None:
+        """Return the Reveal recorder's samples (race graphs): None until the chequered flag."""
+        with self._lock:
+            if not self.engine.finished:
+                return None
+            return self._reveal.samples()
 
     def _say(self, sender: Literal["ENGINEER", "DRIVER", "SYSTEM"], text: str,
              rejected: bool = False, source: RadioSource = "TEMPLATE",

@@ -10,6 +10,11 @@ was about.
 
 The true batteries never reach the in-race view (HR-03): :meth:`reveal` returns
 nothing until the chequered flag. After it, truth is allowed (owner, H1).
+
+For the race graphs (``pitwall_sim.graph``) it also keeps, per sample, the public
+running order and intervals of all cars, every car's TRUE speed and, per alert, the
+Rival's TRUE battery and ours when it fired; :meth:`samples` hands them over after
+the flag, like :meth:`reveal`.
 """
 
 from __future__ import annotations
@@ -87,6 +92,31 @@ class RevealData:
     """Calls made on an estimate off by more than ``OFF_MJ``."""
 
 
+@dataclass(frozen=True)
+class RevealSamples:
+    """Everything the recorder sampled, for the race graphs (after the flag only)."""
+
+    rivals: tuple[str, ...]
+    t_s: Array
+    lap: Array
+    """Our Car's race progress in laps, as :attr:`RivalSeries.lap`."""
+    order: list[list[str]]
+    """Public running order at each sample."""
+    interval_s: list[dict[str, float]]
+    """Public interval to the car ahead at each sample."""
+    estimate_mj: Array
+    """(samples, rivals) Radar Estimates."""
+    confidence: Array
+    truth_mj: Array
+    """(samples, rivals) TRUE batteries."""
+    speed_kmh: dict[str, Array]
+    """Every car's TRUE speed at each sample (Our Car included)."""
+    alert_truth: dict[str, tuple[float, float]]
+    """alert_id -> (the Rival's TRUE battery, Our Car's battery) when it fired (MJ)."""
+    battle_s: dict[str, float]
+    """Rival -> race seconds Our Car raced it (as :attr:`RivalSeries.battle_s`)."""
+
+
 @dataclass
 class RevealRecorder:
     """Collects the Reveal while the race runs (truth kept here, never in the view)."""
@@ -103,9 +133,17 @@ class RevealRecorder:
     _next_t: float = 0.0
     calls: list[CallContext] = field(default_factory=list)
     _due_lap: list[int] = field(default_factory=list)
+    _order: list[list[str]] = field(default_factory=list)
+    _interval: list[dict[str, float]] = field(default_factory=list)
+    _speed: list[dict[str, float]] = field(default_factory=list)
+    _alert_truth: dict[str, tuple[float, float]] = field(default_factory=dict)
 
-    def sample(self, view: EngineerView, truth_mj: dict[str, float]) -> None:
-        """Store one sample if ``SAMPLE_S`` has passed (call every tick)."""
+    def sample(self, view: EngineerView, truth_mj: dict[str, float],
+               speed_kmh: dict[str, float] | None = None) -> None:  # fmt: skip
+        """Store one sample if ``SAMPLE_S`` has passed (call every tick).
+
+        ``speed_kmh``: every car's TRUE speed (race graphs, released after the flag).
+        """
         if view.t_s < self._next_t:
             return
         self._next_t = view.t_s + SAMPLE_S
@@ -116,12 +154,19 @@ class RevealRecorder:
         self._conf.append(np.array([view.radar[d].confidence for d in self.rivals]))
         self._truth.append(np.array([truth_mj[d] for d in self.rivals]))
         order, interval = view.timing.order, view.timing.interval_s
+        self._order.append(list(order))
+        self._interval.append(dict(interval))
+        self._speed.append(dict(speed_kmh or {}))
         if self.our in order:
             k = order.index(self.our)
             if k > 0 and (interval.get(self.our) or 99.0) <= BATTLE_GAP_S:
                 self._battle[order[k - 1]] = self._battle.get(order[k - 1], 0.0) + SAMPLE_S
             if k + 1 < len(order) and (interval.get(order[k + 1]) or 99.0) <= BATTLE_GAP_S:
                 self._battle[order[k + 1]] = self._battle.get(order[k + 1], 0.0) + SAMPLE_S
+
+    def on_alert(self, alert_id: str, rival_truth_mj: float, our_mj: float) -> None:
+        """Keep the Rival's TRUE battery and ours when an alert fired (graphs, after the flag)."""
+        self._alert_truth[alert_id] = (rival_truth_mj, our_mj)
 
     def on_call(self, record: CallRecord, rival: str | None, view: EngineerView,
                 truth_mj: dict[str, float]) -> None:  # fmt: skip
@@ -154,6 +199,21 @@ class RevealRecorder:
                                       est[:, k], conf[:, k], truth[:, k]))  # fmt: skip
         off = sum(c.error_mj is not None and abs(c.error_mj) > OFF_MJ for c in self.calls)
         return RevealData(series, list(self.calls), mae, off)
+
+    def samples(self) -> RevealSamples:
+        """Return every sample (call only after the flag)."""
+        cars = (self.our, *self.rivals)
+        speed = {d: np.array([s.get(d, np.nan) for s in self._speed]) for d in cars}
+        n_rivals = len(self.rivals)
+
+        def table(rows: list[Array]) -> Array:
+            return np.array(rows) if rows else np.zeros((0, n_rivals))
+
+        return RevealSamples(
+            self.rivals, np.array(self._t), np.array(self._lap), list(self._order),
+            list(self._interval), table(self._est), table(self._conf), table(self._truth),
+            speed, dict(self._alert_truth), dict(self._battle),
+        )  # fmt: skip
 
 
 def _place(view: EngineerView, our: str) -> tuple[int, float | None, str | None, str | None]:
