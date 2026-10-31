@@ -9,6 +9,8 @@ the driver with F1 / F2 / F3, and after the flag a call summary shows how each
 call worked out. A test bench exports races with full Ground Truth and scores
 battery estimators (your own plugs in; see below).
 
+![Live pit wall at 16x: race start, alerts, a typed radio call, then the Safety Car](docs/screenshots/pitwall_race.gif)
+
 ![Live pit wall: an ATTACK alert with its evidence, Test mode on](docs/screenshots/demo_pitwall.png)
 
 Personal use only (real team and driver names). Specs are in `docs/` (start with
@@ -25,8 +27,8 @@ Needs Python 3.13. No GPU, no network: the Suzuka track
 model is in the repository (`data/tracks/suzuka.parquet`).
 
 ```powershell
-git clone https://github.com/Dronzer2code/We_are_racing-not_testing---F1sim_lite.git
-cd We_are_racing-not_testing---F1sim_lite
+git clone https://github.com/Dronzer2code/simply-clipping.git
+cd simply-clipping
 py -3.13 -m venv .venv
 .venv\Scripts\Activate.ps1
 python -m pip install --upgrade pip
@@ -55,6 +57,11 @@ starts are quick.
    - `Closing-speed scenario`: you start P14; the cars in P7-P9 start empty and
      clip on the straights, so you close on them fast: a CLOSING-SPEED RISK
      alert comes within the first lap or two.
+   - **Safety Car on lap**: force a Safety Car (the cheap pit stop call).
+   - **Rain from lap**: rain starts; rivals switch to intermediates over the
+     next laps.
+   - **Real race moment**: start from a lap of the real 2026 Japanese GP
+     (order, gaps, tyres from OpenF1; needs network the first time).
 2. **Pause on alert** stops the race at each new alert until you answer it.
 3. **Test mode** shows the rivals' TRUE battery next to the Radar Estimate and,
    in the call summary, whether each alert was right. A real team cannot see
@@ -63,18 +70,31 @@ starts are quick.
    and the alert feed. Speed: PAUSE / 1x / 4x / 16x (Space pauses).
 5. **Answer an alert** with its buttons or **F1 / F2 / F3** (newest alert).
    Click an alert to see its evidence: which rule fired (energy, observed clip,
-   own battery), the batteries, the gap. Unanswered alerts expire after 8 s.
+   own battery), the batteries, the gap. Unanswered alerts expire after 8 s of
+   race time and stay on screen a few seconds, greyed, as "missed".
    - ATTACK [1] *Attack now*: the driver attacks for up to 2 laps or until the
      pass is made, in PUSH, using all the grip to stay in the tow, Overtake mode when
      available.
    - DEFEND [1] *Defend into &lt;corner&gt;*: inside line and deploy kept for the
      straights until the car behind is more than 1.0 s back or has passed (at
      most 2 laps).
-   - You can also send commands directly: Energy Mode, DEFEND, ATTACK, BOX.
-6. **Call summary** (button, and it opens by itself at the flag): every alert,
+   - You can also send commands directly: Energy Mode, DEFEND, ATTACK, BOX,
+     CANCEL BOX, HOLD, PUSH LAP, Manage tyres.
+6. **Team radio**: type an order ("save this lap, attack into turn 1 next lap",
+   "box box, mediums") and press Enter, or hold the `` ` `` key and speak
+   (offline speech-to-text; `pip install faster-whisper sounddevice`). Tick
+   **Driver voice** to hear the replies. An optional hosted LLM understands free
+   phrasing: set `radio_llm.provider` in `config/app.yaml` and the API key.
+7. **Pit stop strategy** compares staying out with stopping now or in 1-3 laps,
+   from public data only; it refreshes every lap (first result after about 30 s).
+   The **Telemetry** tab shows speed, throttle and battery around the lap, with
+   the previous lap behind it.
+8. **Call summary** (button, and it opens by itself at the flag): every alert,
    what you called (or ignored / expired), what happened in the next 2 laps, and
    the totals (calls made, successful attacks and defends; in Test mode, alerts
-   right per Ground Truth).
+   right per Ground Truth). The **Reveal** tab plots each rival's true battery
+   against our estimate, gives every call its cost in seconds against the best
+   option, and an engineer score out of 100.
 
 ### Command-line checks
 
