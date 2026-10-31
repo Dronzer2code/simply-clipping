@@ -23,7 +23,8 @@ docs/
 ├── planning/    what to do next
 │   ├── TASKS.md                  every task: ID, files, dependencies, acceptance, status
 │   ├── SPRINT.md                 owner's deadline sprint texts (verbatim)
-│   └── BUILD_PROMPTS.md          operator prompts that drive an agent through TASKS.md
+│   ├── BUILD_PROMPTS.md          operator prompts that drive an agent through TASKS.md
+│   └── IMPROVEMENTS.md           showcase review: Simply Clipping features, UI/feature improvements, pitch edits
 ├── status/      where the project stands
 │   ├── SESSION_CONTEXT.md        handoff log: what each session / sprint day did and decided
 │   └── PROJECT_STATUS.md         status audit after a clean local run: done, to come, needs changes
