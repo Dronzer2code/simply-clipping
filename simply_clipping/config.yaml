@@ -1,0 +1,82 @@
+# Simply Clipping constants (docs/spec/SIMPLY_CLIPPING_SPEC.md CONFIG). Every number the
+# package uses lives here (SC-R04). Sources:
+#   RADAR  the owner's Rival Battery Radar spec (docs/planning/SPRINT.md Part 5; alert rules Part 2)
+#   RULES  2026 regulations as published (the sim keeps the same values in its own Rule Set;
+#          copied here because simply_clipping must not import the sim, SC-R01)
+#   BRIDGE docs/spec/SIMPLY_CLIPPING_BRIDGE.md
+#   TUNE (SC-n)  set in that task, on seeds 1-5 only (SC-R03); null until then
+
+signal:
+  resample_hz: 10.0 # RADAR
+  savgol_window: 7 # RADAR, samples at resample_hz
+  savgol_order: 2 # RADAR
+  max_gap_s: 0.5 # RADAR: no interpolation across gaps longer than this
+
+car:
+  mass_kg: 800.0 # RADAR (without fuel; fuel below, lesson L-d)
+  rho_kg_m3: 1.18 # RADAR
+  crr: 0.012 # RADAR
+  g_ms2: 9.81
+  eta: 0.92 # RADAR drivetrain / MGU-K efficiency
+  p_ice_kw: 400.0 # RADAR default ICE power
+  p_ice_kw_by_team: {} # TUNE (SC-1), lesson L-d: team_id -> kW, fitted on seeds 1-5 from public data
+  p_elec_max_kw: 350.0 # RULES MGU-K maximum
+
+fuel: # lesson L-d: mass falls over the race
+  start_kg: null # TUNE (SC-1)
+  burn_kg_per_lap: null # TUNE (SC-1)
+
+taper: # RULES, lesson L-b: MGU-K power is cut with speed by regulation; that is not CLIP
+  start_kmh: 290
+  end_kmh: 355
+  overtake_start_kmh: 337
+  overtake_end_kmh: 355
+
+states: # RADAR / BRIDGE state definitions (the scorer's state_true uses the same)
+  full_throttle_pct: 95
+  lift_throttle_pct: 20
+  deploy_min_kw: 150
+  clip_max_kw: 50
+  clip_max_accel_ms2: 0.3 # "speed flat or falling"
+  partial_deploy_kw: [150, 250] # lesson L-c: deploy levels seen on straights (SPRINT Part 5 partial_deploy)
+
+cda_fit:
+  straight_first_s: 2.0 # RADAR: full-throttle samples in the first 2 s of each straight
+  aero_modes: [straight, corner] # RADAR: one CdA per aero mode
+  assume_full_deploy: false # lesson L-c: the RADAR spec assumed 350 kW here; that is wrong
+
+energy:
+  e_min_mj: 0.0 # RADAR clamp
+  e_max_mj: 4.0 # RADAR clamp
+  prior_mj: 2.0 # scaffold output until SC-4 (half of e_max_mj)
+  prior_confidence: 0.1 # scaffold output until SC-4
+
+anchor: # lesson L-a: a super-clip is not an empty battery
+  min_clip_s: 1.0 # a CLIP shorter than this is partial deployment, not a clip (sim sprint day 5)
+  min_straight_m: null # TUNE (SC-4)
+  clip_energy_mj: null # TUNE (SC-4): energy left when a car clips; NOT 0
+
+confidence: # lesson L-e: 0.8 confidence must be right ~80 % of the time
+  half_life_s: null # TUNE (SC-4)
+  right_tol_mj: 0.5 # OPEN O-1 (owner): proposed meaning of "right" for the reliability check
+  calibration: [] # TUNE (SC-4 / SC-7): reliability table fitted on seeds 1-5
+
+battles:
+  within_s: 1.0 # RADAR
+
+alerts: # RADAR / SPRINT Part 2
+  attack_gap_s: 1.0
+  attack_margin_mj: 0.8
+  defend_gap_s: 0.6
+  defend_margin_mj: 0.8
+  repass_window_s: 15.0
+  repass_our_max_mj: 1.0
+  repass_straight_m: 600.0
+  closing_dv_kmh: 40.0
+  closing_range_m: 200.0
+  closing_episode_gap_s: null # TUNE (SC-6), lesson L-f: one alert per episode
+  suppress_laps: 1
+  expires_s: 8.0
+
+output:
+  estimates_hz: 1.0 # BRIDGE: once a second per car is plenty
