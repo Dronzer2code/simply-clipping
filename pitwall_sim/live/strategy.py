@@ -117,8 +117,12 @@ def plans_for(engine: RaceEngine) -> list[tuple[PitPlan, Compound | None]]:
 
 
 def _run(public: Snapshot, our: str, plan: PitPlan, compound: Compound | None, k: int,
-         seed_key: int) -> tuple[int, float, float, str | None]:  # fmt: skip
-    """One fork: (position, our progress m, car-ahead progress m, car ahead)."""
+         seed_key: int) -> tuple[int, float, float, str | None, float]:  # fmt: skip
+    """One fork: (position, our progress m, car-ahead progress m, car ahead, our speed m/s).
+
+    The speed is measured over the fork itself, so it is right for a race picked up
+    mid-way too (E3: progress counts the real laps, race time starts at 0).
+    """
     fork = RaceEngine.from_snapshot(public)
     for n, name in enumerate(RESEEDED):  # paired across plans (analysis fork only)
         fork.rngs[name] = np.random.default_rng([seed_key, k, n])
@@ -129,6 +133,8 @@ def _run(public: Snapshot, our: str, plan: PitPlan, compound: Compound | None, k
     ahead = order[k_our - 1] if k_our > 0 else None
     a = fork.driver_ids.index(ahead) if ahead else None
     start_lap = int(fork.st.lap[i])
+    t0 = fork.t
+    m0 = float(fork._progress_m()[i])
     box_at = None if plan == "STAY_OUT" else start_lap + dict(BOX_PLANS)[plan]
     end_lap = min(start_lap + HORIZON_LAPS, fork.laps)
     while not fork.finished and int(fork.st.lap[i]) < end_lap and fork.status[i] != "DNF":
@@ -141,14 +147,15 @@ def _run(public: Snapshot, our: str, plan: PitPlan, compound: Compound | None, k
     our_m = float(prog[i]) if prog is not None else float(fork.st.lap[i]) * length
     ahead_m = float(prog[a]) if (prog is not None and a is not None) else float("nan")
     rank = [fork.driver_ids[int(j)] for j in fork._classification].index(our) + 1
-    return rank, our_m, ahead_m, ahead
+    speed = (our_m - m0) / max(fork.t - t0, 1.0)
+    return rank, our_m, ahead_m, ahead, speed
 
 
-Runs = dict[tuple[PitPlan, Compound | None], list[tuple[int, float, float, str | None]]]
+Runs = dict[tuple[PitPlan, Compound | None], list[tuple[int, float, float, str | None, float]]]
 
 
 def run_plan(public: Snapshot, our: str, plan: PitPlan, compound: Compound | None,
-             forks: int) -> list[tuple[int, float, float, str | None]]:  # fmt: skip
+             forks: int) -> list[tuple[int, float, float, str | None, float]]:  # fmt: skip
     """All forks of one plan (paired with every other plan by fork index)."""
     seed_key = int(public.race_state.hash()[:8], 16)
     return [_run(public, our, plan, compound, k, seed_key) for k in range(forks)]
@@ -157,7 +164,7 @@ def run_plan(public: Snapshot, our: str, plan: PitPlan, compound: Compound | Non
 def summarise(runs: Runs, race_t_s: float, forks: int) -> tuple[StrategyResult, ...]:
     """Mean position per plan and the gain on the car ahead against STAY_OUT, seconds."""
     stay = runs[("STAY_OUT", None)]
-    speed = max(float(np.mean([r[1] for r in stay])) / max(race_t_s, 1.0), 1.0)  # m / race s
+    speed = max(float(np.mean([r[4] for r in stay])), 1.0)  # our m per race s in the forks
     out = []
     for (plan, compound), rows in runs.items():
         gaps = [(r[1] - r[2]) - (s[1] - s[2]) for r, s in zip(rows, stay, strict=True)
