@@ -94,7 +94,13 @@ class SetupScreen(QDialog):
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
         layout = QVBoxLayout(self)
-        layout.addWidget(QLabel("<b>Live pit wall lite</b> - Suzuka 2026"))
+        title = QLabel("<span style='font-size:16pt'><b>We Are Racing, Not Testing</b></span>"
+                       "<br>You are the race engineer of one F1 car at Suzuka, 2026 rules."
+                       "<br>You see your own battery. Rivals' batteries are hidden: you only "
+                       "get estimates.<br>Make the calls; after the flag see what each was "
+                       "worth.")  # fmt: skip
+        title.setWordWrap(True)
+        layout.addWidget(title)
         layout.addLayout(form)
         layout.addWidget(self.pause_on_alert)
         layout.addWidget(self.test_mode)

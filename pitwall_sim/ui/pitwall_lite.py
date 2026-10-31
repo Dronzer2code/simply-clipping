@@ -147,12 +147,30 @@ def _label(text: str = "", size: int = 9, bold: bool = False, color: str = TEXT)
     return label
 
 
-def _panel(title: str, inner: QWidget | None = None) -> tuple[QFrame, QVBoxLayout]:
+#: Radar states in plain words (pitch UI: viewers do not know DEPLOY / CLIP).
+STATE_WORDS = {"DEPLOY": "deploying", "CLIP": "clipping", "HARVEST": "harvesting",
+               "LIFT": "lifting", "CRUISE": "cruising"}  # fmt: skip
+MISSED_SHOW_S = 6.0
+"""Wall seconds an unanswered alert stays on screen, greyed (at 16x it lives 0.5 s)."""
+MAX_CARDS = 4
+
+
+def _sure(confidence: float) -> str:
+    """Confidence as a word plus percent: 'high (82%)'."""
+    word = "high" if confidence >= 0.7 else "medium" if confidence >= 0.4 else "low"
+    return f"{word} ({confidence:.0%})"
+
+
+def _panel(title: str, inner: QWidget | None = None, hint: str = "") -> tuple[QFrame, QVBoxLayout]:
+    """Build a titled panel; ``hint`` is one plain-language line for people new to F1."""
     frame = QFrame()
-    frame.setStyleSheet(f"QFrame {{ background:{PANEL}; border-radius:4px; }}")
+    frame.setStyleSheet(f"QFrame {{ background:{PANEL}; border-radius:6px; }}")
     layout = QVBoxLayout(frame)
-    layout.setContentsMargins(6, 4, 6, 4)
-    layout.addWidget(_label(title.upper(), 8, True, TEXT_DIM))
+    layout.setContentsMargins(8, 6, 8, 6)
+    head = _label(title.upper(), 10, True, TEXT)
+    layout.addWidget(head)
+    if hint:
+        layout.addWidget(_label(hint, 9, False, TEXT_DIM))
     if inner is not None:
         layout.addWidget(inner)
     return frame, layout
@@ -165,6 +183,7 @@ class AlertCard(QFrame):
         """Build the card for ``alert``."""
         super().__init__()
         self.alert = alert
+        self.ended_wall: float | None = None
         colour = ALERT_COLOURS[alert.type]
         dim = alert.confidence < window.low_confidence
         text_colour = TEXT_DIM if dim else TEXT
@@ -177,8 +196,8 @@ class AlertCard(QFrame):
         top = QHBoxLayout()
         top.addWidget(_label(alert.type.replace("_", " "), 9, True, TEXT_DIM if dim else colour))
         top.addStretch()
-        top.addWidget(_label(f"conf {alert.confidence:.2f}" + (" (low)" if dim else ""), 8,
-                             color=TEXT_DIM))  # fmt: skip
+        self.status = _label(f"sure: {_sure(alert.confidence)}", 9, color=TEXT_DIM)
+        top.addWidget(self.status)
         layout.addLayout(top)
         layout.addWidget(_label(headline, 10, False, text_colour))
         self.bar = QProgressBar()
@@ -237,6 +256,18 @@ class AlertCard(QFrame):
         a = self.alert
         span = max(a.expires_t - a.created_t, 1e-6)
         self.bar.setValue(int(1000 * max(a.expires_t - t_s, 0.0) / span))
+
+    def mark_missed(self) -> None:
+        """Grey out an alert that ended unanswered; it stays a moment (16x is fast)."""
+        self.ended_wall = time.perf_counter()
+        self.status.setText("missed - no call made")
+        self.bar.setValue(0)
+        for button in self.buttons.values():
+            button.setEnabled(False)
+        self.setStyleSheet(
+            f"QFrame {{ background:{BG}; border-left:4px solid {TEXT_DIM}; }}"
+            f" QLabel {{ border:none; color:{TEXT_DIM}; }}"
+        )
 
 
 class SummaryDialog(QDialog):
@@ -355,8 +386,10 @@ class RevealTab(QWidget):
         layout = QVBoxLayout(self)
         n_calls = len(reveal.calls)
         layout.addWidget(_label(
-            f"Radar error (MAE, all Rivals): {reveal.radar_mae_mj:.2f} MJ     calls made on an "
-            f"estimate off by more than {OFF_MJ:.0f} MJ: {reveal.calls_off} of {n_calls}", 11, True,
+            f"Our radar was off by {reveal.radar_mae_mj:.2f} MJ on average "
+            "(the battery holds 4 MJ)."
+            f"     Calls made on a guess off by more than {OFF_MJ:.0f} MJ: "
+            f"{reveal.calls_off} of {n_calls}", 11, True,
         ))  # fmt: skip
         layout.addWidget(_label(
             "Solid: the Rival's TRUE battery (revealed after the flag). Dashed: what the "
@@ -595,7 +628,7 @@ class PitWallWindow(QMainWindow):
 
     def _build_tower(self) -> None:
         self.tower = QTableWidget(len(self.drivers), 6)
-        self.tower.setHorizontalHeaderLabels(["P", "Driver", "Gap", "Int", "Tyre", "Stops"])
+        self.tower.setHorizontalHeaderLabels(["Pos", "Driver", "Gap", "Ahead", "Tyre", "Stops"])
         self.tower.verticalHeader().setVisible(False)
         self.tower.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.tower.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
@@ -603,11 +636,13 @@ class PitWallWindow(QMainWindow):
         self.tower.setStyleSheet(f"background:{PANEL}; gridline-color:{BG};")
         self.tower.cellClicked.connect(self._tower_clicked)
         self._row_driver: list[str] = []
-        self.tower_panel, _ = _panel("Timing", self.tower)
+        self.tower_panel, _ = _panel("Race order", self.tower)
 
     def _build_status(self) -> None:
         self.status_panel, layout = _panel("Our car")
-        self.battery = _label("-", 22, True, DEPLOY)
+        self.battery_caption = _label("BATTERY", 9, True, TEXT_DIM)
+        layout.addWidget(self.battery_caption)
+        self.battery = _label("-", 24, True, DEPLOY)
         self.battery_bar = QProgressBar()
         self.battery_bar.setRange(0, 400)
         self.battery_bar.setTextVisible(False)
@@ -621,9 +656,11 @@ class PitWallWindow(QMainWindow):
         layout.addWidget(self.weather_line)
 
     def _build_radar(self) -> None:
-        self.radar_panel, layout = _panel("Rival radar (estimates from the public feed)")
+        self.radar_panel, layout = _panel(
+            "Rival battery radar",
+        )
         grid = QGridLayout()
-        heads = ["", "car", "gap s", "est MJ", "conf", "state"]
+        heads = ["", "car", "gap (s)", "battery (estimate)", "how sure", "doing now"]
         if self.test_mode:
             heads.append("TRUE MJ (test)")
         for c, h in enumerate(heads):
@@ -642,7 +679,7 @@ class PitWallWindow(QMainWindow):
         self.trace.setLabel("left", "MJ")
         self.trace.setLabel("bottom", "race time", units="s")
         self.trace.setMouseEnabled(False, False)
-        self.trace.addLegend(offset=(5, 5))
+        self.trace.addLegend(offset=(-5, -5))  # bottom right: off the lines at the top
         self.our_curve = self.trace.plot(pen=pg.mkPen(OUR_CAR, width=2), name="our battery")
         self.rival_curve = self.trace.plot(
             pen=pg.mkPen(DEFEND, width=2, style=Qt.PenStyle.DashLine),
@@ -678,7 +715,12 @@ class PitWallWindow(QMainWindow):
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setWidget(self.alert_box)
-        self.alert_panel, layout = _panel("Alerts (F1 / F2 / F3 answer the newest)", scroll)
+        self.alert_panel, layout = _panel("Alerts", scroll)
+        self.alert_empty = _label(
+            "No alert right now.", 10, False, TEXT_DIM,
+        )  # fmt: skip
+        self.alert_empty.setWordWrap(True)
+        layout.insertWidget(1, self.alert_empty)
         self.pause_banner = _label("PAUSED ON ALERT - answer it, or press Resume", 10, True, DEFEND)
         self.track_banner = _label("", 12, True, BG)  # SC / VSC (H4)
         self.track_banner.setStyleSheet(f"background:{DEFEND}; color:{BG}; padding:4px;")
@@ -688,21 +730,26 @@ class PitWallWindow(QMainWindow):
 
     def _build_strategy(self) -> None:
         """Strategy panel (H5): pit plans from Radar Estimates and public tyres only."""
-        self.strategy_panel, layout = _panel("Strategy (pit window, from public data)")
+        self.strategy_panel, layout = _panel(
+            "Pit stop strategy",
+        )
         top = QHBoxLayout()
         self.strategy_note = _label("waiting for the first lap", 8, False, TEXT_DIM)
-        top.addWidget(self.strategy_note, 1)
-        refresh = QPushButton("Refresh")
-        refresh.clicked.connect(self.session.refresh_strategy)
-        top.addWidget(refresh)
+        top.addWidget(self.strategy_note, 1)  # refreshes itself every lap (no button)
         layout.addLayout(top)
         self.strategy_table = QTableWidget(5, 4)
-        self.strategy_table.setHorizontalHeaderLabels(["plan", "tyre", "exp. pos", "vs car ahead"])
+        self.strategy_table.setHorizontalHeaderLabels(
+            ["plan", "tyre", "expected place", "vs car ahead"]
+        )
         self.strategy_table.verticalHeader().setVisible(False)
         self.strategy_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.strategy_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self.strategy_table.setStyleSheet(f"background:{PANEL}; gridline-color:{BG};")
-        self.strategy_table.setFixedHeight(170)
+        self.strategy_table.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.strategy_table.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        rows_h = 5 * self.strategy_table.verticalHeader().defaultSectionSize()
+        head_h = self.strategy_table.horizontalHeader().sizeHint().height()
+        self.strategy_table.setFixedHeight(rows_h + head_h + 4)  # all 5 plans, no scroll bar
         layout.addWidget(self.strategy_table)
         self._strategy_shown: object = None
 
@@ -710,9 +757,10 @@ class PitWallWindow(QMainWindow):
         plans = frame.view.strategy
         busy = self.session.strategy_busy
         lap = self.session.strategy_lap
-        note = "computing..." if busy and plans is None else (
-            f"lap {lap}: 4 forks x 6 laps per plan" + ("  (updating)" if busy else "")
-            if plans is not None else "waiting for the first lap")  # fmt: skip
+        first = "working out pit options (first result in about 30 s)"
+        note = first if busy and plans is None else (
+            f"from lap {lap}; green = best plan" + ("  (updating)" if busy else "")
+            if plans is not None else "starts after the first lap")  # fmt: skip
         self.strategy_note.setText(note)
         if plans is None or plans is self._strategy_shown:
             return
@@ -751,7 +799,7 @@ class PitWallWindow(QMainWindow):
         col.addWidget(self.radio_list, 1)
         col.addWidget(self.radio_input)
         col.addWidget(self._build_voice_input())
-        self.radio_panel, _ = _panel("Radio", box)
+        self.radio_panel, _ = _panel("Team radio", box)
 
     def _build_voice_input(self) -> QWidget:
         """H2: push-to-talk (local speech-to-text) and which path understood the message."""
@@ -864,7 +912,7 @@ class PitWallWindow(QMainWindow):
         self.resume_button.clicked.connect(self.resume)
         self.resume_button.setVisible(False)
         row.addWidget(self.resume_button)
-        self.clock = _label("", 11, True)
+        self.clock = _label("", 14, True)
         row.addWidget(self.clock)
         self.behind = _label("", 10, True, CLIP)  # H6: the sim cannot keep up with the speed
         row.addWidget(self.behind)
@@ -1008,8 +1056,11 @@ class PitWallWindow(QMainWindow):
             self._last_table = now
         state = "FINISHED" if frame.finished else (
             "PAUSED ON ALERT" if frame.paused_on_alert else self._speed_name)  # fmt: skip
+        order = view.timing.order
+        place = f"P{order.index(self.our) + 1}" if self.our in order else "-"
         self.clock.setText(
-            f"  lap {min(frame.lap, frame.laps)}/{frame.laps}   t {view.t_s:7.1f} s   {state}"
+            f"  {self.drivers[self.our]['code']} {place}    LAP {min(frame.lap, frame.laps)}"
+            f"/{frame.laps}    {view.t_s:6.0f} s    {state}"
         )
         self.pause_banner.setVisible(frame.paused_on_alert)
         wanted = self.thread_.speed
@@ -1072,7 +1123,7 @@ class PitWallWindow(QMainWindow):
 
     def _draw_status(self, frame: Frame) -> None:
         me = frame.view.our_car
-        self.battery.setText(f"{me.battery_mj:.2f} MJ")
+        self.battery.setText(f"{me.battery_mj:.2f} MJ   ({me.battery_mj / 4.0:.0%})")
         self.battery_bar.setValue(int(me.battery_mj * 100))
         self.status_line.setText(
             f"{me.energy_mode}   {me.compound.value} ({me.tyre_age_laps} laps, wear "
@@ -1103,10 +1154,11 @@ class PitWallWindow(QMainWindow):
             cells[1].setStyleSheet(f"color:{self.drivers[rival]['color']};")
             cells[2].setText(f"{gap:.2f}" if gap is not None else "-")
             known = est.confidence > 0.0  # before its first anchor a Radar knows nothing
-            cells[3].setText(f"{est.energy_mj:.2f}" if known else "unknown")
+            cells[3].setText(f"~{max(est.energy_mj, 0.0):.1f} MJ" if known else "unknown yet")
             cells[3].setStyleSheet(f"color:{TEXT_DIM if dim else TEXT};")
-            cells[4].setText(f"{est.confidence:.2f}" if known else "-")
-            cells[5].setText(est.state)
+            cells[4].setText(_sure(est.confidence) if known else "-")
+            cells[4].setStyleSheet(f"color:{TEXT_DIM if dim else TEXT};")
+            cells[5].setText(STATE_WORDS.get(est.state, est.state))
             cells[5].setStyleSheet(f"color:{STATE_COLOURS.get(est.state, TEXT)};")
             if self.test_mode and frame.truth_mj is not None:
                 cells[6].setText(f"{frame.truth_mj.get(rival, float('nan')):.2f}")
@@ -1132,8 +1184,13 @@ class PitWallWindow(QMainWindow):
                     item = QTableWidgetItem()
                     self.tower.setItem(row, col, item)
                 item.setText(text)
-                item.setForeground(QColor(self.drivers[d]["color"] if col == 1 else TEXT))
-                item.setBackground(QColor("#1E3354" if d == self.our else PANEL))
+                item.setForeground(
+                    QColor(self.drivers[d]["color"] if col == 1 and d != self.our else TEXT)
+                )
+                item.setBackground(QColor("#2A5BA8" if d == self.our else PANEL))
+                font = item.font()
+                font.setBold(d == self.our)
+                item.setFont(font)
                 if col == 0 and frame.view.track_status.status != "GREEN":
                     item.setBackground(QColor(DEFEND))  # SC / VSC: the position column in amber
                     item.setForeground(QColor(BG))
@@ -1141,8 +1198,8 @@ class PitWallWindow(QMainWindow):
     def _draw_trace(self, frame: Frame) -> None:
         if not self._history:
             return
-        ahead, _ = self._neighbours(frame)
-        rival = self.selected_rival or ahead
+        ahead, behind = self._neighbours(frame)
+        rival = self.selected_rival or ahead or behind  # leading: compare with the car behind
         t = np.array([h[0] for h in self._history])
         self.our_curve.setData(t, [h[1] for h in self._history])
         if rival:
@@ -1156,17 +1213,24 @@ class PitWallWindow(QMainWindow):
 
     def _draw_alerts(self, frame: Frame) -> None:
         live = {a.alert_id for a in frame.alerts}
-        for alert_id in [a for a in self._cards if a not in live]:
-            card = self._cards.pop(alert_id)
-            card.setParent(None)
-            card.deleteLater()
+        now = time.perf_counter()
+        for alert_id, card in list(self._cards.items()):
+            if alert_id in live:
+                continue
+            if card.ended_wall is None:  # ended unanswered: grey it, keep it a moment
+                card.mark_missed()
+            elif now - card.ended_wall > MISSED_SHOW_S or len(self._cards) > MAX_CARDS:
+                self._cards.pop(alert_id)
+                card.setParent(None)
+                card.deleteLater()
         for alert in reversed(frame.alerts):  # oldest first: each new one goes on top
             if alert.alert_id not in self._cards:
                 card = AlertCard(self, alert, self.session.headline(alert))
                 self.alert_layout.insertWidget(0, card)
                 self._cards[alert.alert_id] = card
-        for card in self._cards.values():
-            card.set_remaining(frame.view.t_s)
+        for alert_id in live & self._cards.keys():
+            self._cards[alert_id].set_remaining(frame.view.t_s)
+        self.alert_empty.setVisible(not self._cards)
 
     def _draw_radio(self, frame: Frame) -> None:
         via = self.session.radio_path
