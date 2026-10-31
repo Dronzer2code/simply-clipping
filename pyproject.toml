@@ -32,6 +32,10 @@ dev = [
 ]
 # R3 only. MVP (R1) code MUST NOT import llama_cpp (MVP.md CONSTRAINTS).
 radio = ["llama-cpp-python==0.3.36"]
+# Hackathon H2/H3: hosted LLM on the team radio (the standard library works too).
+llm = ["httpx==0.28.1"]
+# Hackathon H2: push-to-talk, local speech-to-text (models under models/stt).
+voice = ["faster-whisper==1.2.1", "sounddevice==0.5.6"]
 
 [tool.setuptools.packages.find]
 include = ["pitwall_sim*", "simply_clipping*"]
@@ -67,5 +71,6 @@ strict = true
 
 [[tool.mypy.overrides]]
 # Third-party packages without type stubs or a py.typed marker.
-module = ["fastf1.*", "pyarrow.*", "scipy.*", "pyqtgraph.*", "pandas.*"]
+module = ["fastf1.*", "pyarrow.*", "scipy.*", "pyqtgraph.*", "pandas.*", "faster_whisper.*",
+          "sounddevice.*"]
 ignore_missing_imports = true

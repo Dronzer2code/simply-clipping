@@ -361,6 +361,31 @@ radio:
   parse_timeout_s: 2.0 # TRD Engineer text -> command default
   reply_timeout_s: 1.5 # TRD Driver replies default
 
+radio_llm:
+  # Hackathon H2/H3: a hosted LLM on the team radio. Chain for engineer messages:
+  # LLM (tool calls, then commands.validate, HR-07) -> keyword parser -> "Say again?".
+  # Driver replies: LLM text checked against Our Car's facts, else the templates.
+  # OWNER DECISION (open): the provider. null = off (keyword parser + templates).
+  provider: null # openai | anthropic | null
+  # anthropic: claude-haiku-5-5 (suggested). openai: PLACEHOLDER, owner picks the model id.
+  model: null
+  api_key_env: null # env var NAME, e.g. OPENAI_API_KEY / ANTHROPIC_API_KEY (default per provider)
+  base_url: null # optional endpoint override (OpenAI-compatible server, proxy)
+  timeout_s: 2.0 # owner H2: LLM gets 2 s, then the keyword parser
+  driver_replies: true # H3: LLM-written unprompted driver lines (fact-checked)
+  max_reply_words: 20 # owner H3: capped at 20 words
+
+voice_input:
+  # Hackathon H2: push-to-talk, local speech-to-text (faster-whisper, CPU int8).
+  # Needs the optional extra `pip install -e ".[voice]"` and a microphone; else
+  # the button is disabled and typing stays.
+  enabled: true
+  model: base.en # tiny.en is faster, base.en more accurate
+  model_dir: models/stt # downloaded on first use (gitignored)
+  compute_type: int8
+  max_record_s: 15.0
+  key: "`" # hold to talk
+
 calibration:
   # Owner round 15 (calibration acceptance, MVP scope): MUST lap time within 2 %,
   # order within +-2, plausibility limits met, no bound hits on shared tyre

@@ -30,18 +30,22 @@ import numpy.typing as npt
 from pitwall_sim.config.loader import DEFAULT_CONFIG_DIR, load_grid
 from pitwall_sim.engineer.calls import CallOption, CallRunner, CallStep, alert_line, options
 from pitwall_sim.engineer.commands import CommandType, EngineerCommand, make_command
-from pitwall_sim.engineer.radio_parser import SAY_AGAIN, corner_names, parse
+from pitwall_sim.engineer.radio_parser import SAY_AGAIN, ParseResult, corner_names, parse
 from pitwall_sim.engineer.records import CallCost, CallRecord, RadioEvent, RadioSource
 from pitwall_sim.live import presets
 from pitwall_sim.live.costs import CallSpec, call_cost, describe
 from pitwall_sim.live.driver_radio import DriverRadio
 from pitwall_sim.live.presets import Preset
+from pitwall_sim.live.radio_ai import RadioAI
 from pitwall_sim.live.reveal import RevealData, RevealRecorder
 from pitwall_sim.live.strategy import PublicInfo, StrategyWorker, plans_for
 from pitwall_sim.observe.alerts import Alert, make_provider
 from pitwall_sim.observe.engineer_view import EngineerView, EngineerViewBuilder
 from pitwall_sim.race.engine import RaceEngine, RaceSetup
 from pitwall_sim.race.snapshot import Snapshot
+from pitwall_sim.radio import llm_commands
+from pitwall_sim.radio.hosted_llm import make_provider as make_llm_provider
+from pitwall_sim.radio.llm_replies import reply_facts, write_reply
 
 MJ = 1e6
 #: Driver radio when the track status changes (H4, templates).
@@ -173,6 +177,10 @@ class LiveSession:
     """Per CallRecord: what the call was, to replay it and its alternatives (H1 costs)."""
     """snapshot_id -> the race just before the call(s) made at that moment."""
     paused_on_alert: bool = False
+    radio_ai: RadioAI = field(init=False)
+    """Hosted radio LLM (H2/H3) and its worker; off unless ``radio_llm.provider`` is set."""
+    radio_path: str = field(init=False, default="")
+    """Which path understood the last engineer message (LLM / KEYWORD / SAY AGAIN)."""
 
     def __post_init__(self) -> None:
         """Build the race, the view builder, the alert provider and the call runner."""
@@ -217,6 +225,9 @@ class LiveSession:
         self._status = self.engine.track_status.status
         """command_ids issued so far (CallRecords take the ones of their call)."""
         self._view = self._builder.build()
+        self.radio_ai = RadioAI(
+            make_llm_provider(self.engine.app.radio_llm), self.engine.app.radio_llm
+        )
         grid = {d.driver_id: (t, d) for t in self.engine.grid.teams for d in t.drivers}
         self.drivers = {
             d: {"code": grid[d][1].code, "team": grid[d][0].display_name,
@@ -282,7 +293,7 @@ class LiveSession:
         self._reveal.after(view, self.engine.finished)
         self._strategy_upkeep(view)
         if not self.engine.finished and (said := self._driver_radio.update(view)):
-            self._say("DRIVER", said)  # unprompted (H3), template
+            self._driver_line(said, view)  # unprompted (H3): template, or LLM-written
         if view.track_status.status != self._status:
             self._track_status_radio(self._status, view.track_status.status)
             self._status = view.track_status.status
@@ -337,18 +348,24 @@ class LiveSession:
             self._log_call(None, ids, str(kind), snapshot_id, spec)
             return None
 
-    def radio_message(self, text: str, source: RadioSource = "TEXT") -> list[str]:
+    def radio_message(self, text: str, source: RadioSource = "TEXT",
+                      result: ParseResult | None = None) -> list[str]:  # fmt: skip
         """Engineer radio (H2): parse ``text`` into commands, send them; return rejections.
 
         Each command goes through ``commands.validate`` and the queue (HR-07) and is a
         :class:`CallRecord`; "next lap" ones are sent at the start of Our Car's next
-        lap. Nothing understood: the driver answers "Say again?".
+        lap. Nothing understood: the driver answers "Say again?". ``result``: the
+        commands the hosted LLM proposed (else the keyword parser reads ``text``).
         """
         with self._lock:
             view = self._view
             car = view.our_car
             compound = "MEDIUM" if str(car.compound) in ("HARD", "Compound.HARD") else "HARD"
-            result = parse(text, self._corners, car.lap + 1, compound, str(car.energy_mode))
+            path = "LLM" if result is not None else "KEYWORD"
+            if result is None:
+                result = parse(text, self._corners, car.lap + 1, compound, str(car.energy_mode))
+            path = path if result.commands else "SAY AGAIN"
+            self.radio_path = ("VOICE > " if source == "VOICE" else "") + path
             snapshot_id = self._snapshot_now()
             first = len(self._issued)
             reasons: list[str] = []
@@ -380,6 +397,51 @@ class LiveSession:
             else:
                 self._acks.append(_Ack(self.engine.t + latency, reply))
             return reasons
+
+    def radio_send(self, text: str, source: RadioSource = "TEXT") -> None:
+        """Engineer radio from the UI (H2): never blocks on the hosted LLM.
+
+        LLM off: the keyword parser now (:meth:`radio_message`). LLM on: the request is
+        built here (Our Car data, public timing, corner names; HR-03) and runs on the
+        radio worker; its tool calls, or the keyword parser if it fails or times out,
+        then go through :meth:`radio_message` (validation, HR-07).
+        """
+        ai = self.radio_ai
+        if not ai.on or ai.provider is None:
+            self.radio_message(text, source)
+            return
+        provider = ai.provider
+        with self._lock:
+            ctx = self.engine.command_context()
+            corners = [(c.corner_id, c.name, list(c.aliases)) for c in self.engine.track.corners]
+            user = llm_commands.prompt(text, self._view, self.setup.our_driver_id, ctx, corners)
+            tool_set = llm_commands.tools(ctx, self.engine.app.engineer)
+            self.radio_path = ("VOICE > " if source == "VOICE" else "") + "LLM ..."
+
+        def job() -> None:
+            result = llm_commands.interpret(provider, user, tool_set, ai.timeout_s)
+            self.radio_message(text, source, result)
+
+        ai.submit(job)
+
+    def _driver_line(self, template: str, view: EngineerView) -> None:
+        """Say an unprompted driver line (H3): LLM-written if it passes the fact check."""
+        ai = self.radio_ai
+        if not ai.replies_on or ai.provider is None:
+            self._say("DRIVER", template)
+            return
+        provider = ai.provider
+        facts = reply_facts(view, self.setup.our_driver_id, self.engine.laps, template)
+
+        def job() -> None:
+            text = write_reply(provider, facts, ai.timeout_s, ai.max_words)
+            with self._lock:
+                if text is not None:
+                    self._say("DRIVER", text, source="LLM")
+                else:
+                    self._say("DRIVER", template, is_fallback=True)
+
+        ai.submit(job)
 
     def call(self, alert_id: str, key: int) -> list[str]:
         """Answer an alert with option ``key`` (1..3); return rejection reasons."""
@@ -547,6 +609,7 @@ class LiveSession:
         """Stop background work (the strategy processes)."""
         if self._strategy is not None:
             self._strategy.close()
+        self.radio_ai.close()
 
     def compute_cost(self, index: int) -> str:
         """Decision cost of call ``index`` (H1): forks from its snapshot; after the flag only.
