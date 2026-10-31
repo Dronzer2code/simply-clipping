@@ -166,3 +166,46 @@ def test_16x_is_16x(qtbot: QtBot) -> None:
     window.set_speed("PAUSE")
     assert 12.0 < rate < 17.5, rate
     window.close()
+
+
+def test_telemetry_tab_fills_with_a_ghost_at_16x(qtbot: QtBot) -> None:
+    """H6: speed / throttle / battery vs lap distance; the previous lap as a ghost."""
+    window, _ = _window(qtbot)
+    window.trace_tabs.setCurrentWidget(window.telemetry_panel)
+    window.set_speed("16x")
+    qtbot.waitUntil(lambda: window.telemetry.telemetry.has_ghost, timeout=60000)
+    qtbot.wait(1000)
+    window.set_speed("PAUSE")
+    x, _ = window.telemetry.curves["speed"].getData()
+    gx, _ = window.telemetry.ghosts["battery"].getData()
+    assert x is not None and gx is not None and len(gx) > 50 and len(x) > 0
+    assert max(window.frame_times) < 0.100, max(window.frame_times)
+    window.close()
+
+
+def test_reveal_engineer_score_fills_after_the_costs(qtbot: QtBot) -> None:
+    """E2: 'computing' until every call's cost is in, then the score out of 100."""
+    from pitwall_sim.engineer.records import CallCost
+    from pitwall_sim.ui.pitwall_lite import RevealTab
+
+    window, session = _window(qtbot, laps=1)
+    assert session.command(T.SET_ENERGY_MODE, {"mode": "PUSH"}, "Push.") is None
+    assert session.command(T.SET_ENERGY_MODE, {"mode": "HARVEST"}, "Harvest.") is None
+    window.set_speed("16x")
+    qtbot.waitUntil(lambda: session.engine.finished, timeout=60000)
+    window.set_speed("PAUSE")
+    reveal = session.reveal()
+    assert reveal is not None and len(reveal.calls) == 2
+    tab = RevealTab(reveal, session.drivers)
+    qtbot.addWidget(tab)
+    costs: list[CallCost] = []
+    tab.enable_score(20.0, lambda: list(costs))
+    assert "computing" in tab.score_label.text()
+    costs.append(CallCost("a#0", 101.0, "HOLD", 100.0, 1.0, 5))
+    tab.set_cost(0, "your call: +1.0 s vs best option (HOLD)")
+    assert "computing" in tab.score_label.text() and "1 / 2" in tab.score_label.text()
+    costs.append(CallCost("a#1", 100.0, "HARVEST", 100.0, 0.0, 5))
+    tab.set_cost(1, "best call")
+    assert tab.score_label.text() == "Engineer score: 95 / 100"  # 100 exp(-1 / 20)
+    assert "2 calls, 1 best" in tab.score_line.text()
+    window.close()

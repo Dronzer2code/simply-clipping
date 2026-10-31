@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import time
 from collections import deque
+from collections.abc import Callable
 from typing import Any
 
 import numpy as np
@@ -46,11 +47,14 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from pitwall_sim.debrief.scorer import engineer_score
 from pitwall_sim.engineer.commands import CommandType
+from pitwall_sim.engineer.records import CallCost
 from pitwall_sim.live.reveal import OFF_MJ, RevealData
 from pitwall_sim.live.session import Frame, LiveSession
 from pitwall_sim.observe.alerts import Alert
 from pitwall_sim.radio.voice import DriverVoice, available
+from pitwall_sim.ui.telemetry_plot import TelemetryPlot
 
 #: docs/spec/UI_DESIGN.md COLOURS.
 BG, PANEL, TEXT, TEXT_DIM = "#101214", "#181B1F", "#E6E8EB", "#8A9099"
@@ -287,6 +291,9 @@ class SummaryDialog(QDialog):
         if reveal is not None:  # only after the flag (truth allowed then)
             self.reveal_tab = RevealTab(reveal, session.drivers)
             self.tabs.addTab(self.reveal_tab, "Reveal")
+            self.reveal_tab.enable_score(  # E2: engineer score from the decision costs
+                session.engine.app.debrief.score_scale_s, lambda: list(session.costs.values())
+            )
             if session.call_log:  # H1: decision costs in the background
                 self.cost_worker = CostWorker(session, self)
                 self.cost_worker.done.connect(self.reveal_tab.set_cost)
@@ -433,6 +440,46 @@ class RevealTab(QWidget):
         item.setForeground(QColor(DEPLOY if good else (CLIP if "+" in text else TEXT_DIM)))
         self.table.setItem(row, self.table.columnCount() - 1, item)
         self.progress.setValue(self.progress.value() + 1)
+        self._update_score()
+
+    def enable_score(self, scale_s: object, costs: Callable[[], list[CallCost]]) -> None:
+        """Show the engineer score (E2) once every call's cost is in."""
+        self.score_scale_s = scale_s
+        self._score_costs = costs
+        self.score_label = _label("", 11, True)
+        self.score_line = _label("", 9, color=TEXT_DIM)
+        layout = self.layout()
+        assert isinstance(layout, QVBoxLayout)
+        at = layout.indexOf(self.progress) + 1
+        layout.insertWidget(at, self.score_label)
+        layout.insertWidget(at + 1, self.score_line)
+        self._update_score()
+
+    def _update_score(self) -> None:
+        costs = getattr(self, "_score_costs", None)
+        if costs is None:
+            return
+        n_calls, done = self.table.rowCount(), self.progress.value()
+        scale = self.score_scale_s
+        if n_calls == 0:
+            self.score_label.setText("Engineer score: - (no calls made)")
+            self.score_line.setText("make calls in the race to be scored (TRD DEBRIEF AND SCORING)")
+            return
+        if not isinstance(scale, (int, float)):
+            self.score_label.setText(f"Engineer score: - (debrief.score_scale_s is {scale})")
+            return
+        if done < n_calls:
+            self.score_label.setText(f"Engineer score: computing... ({done} / {n_calls} costs)")
+            self.score_line.setText("")
+            return
+        got = costs()
+        score = engineer_score(got, float(scale))
+        colour = DEPLOY if score.score >= 80 else (DEFEND if score.score >= 50 else CLIP)
+        self.score_label.setText(f"Engineer score: {score.score:.0f} / 100")
+        self.score_label.setStyleSheet(f"color:{colour};")
+        failed = n_calls - len(got)
+        self.score_line.setText(score.breakdown() + (f"   ({failed} cost(s) failed, not scored)"
+                                                     if failed > 0 else ""))  # fmt: skip
 
 
 class PitWallWindow(QMainWindow):
@@ -472,14 +519,15 @@ class PitWallWindow(QMainWindow):
         self._build_radar()
         self._build_strategy()
         self._build_trace()
+        self._build_telemetry()
         self._build_alerts()
         self._build_radio()
         self._build_controls()
 
         left = QSplitter(Qt.Orientation.Vertical)
         left.addWidget(self.map_panel)
-        left.addWidget(self.trace_panel)
-        left.setSizes([520, 220])
+        left.addWidget(self.trace_tabs)  # battery trace + telemetry (H6)
+        left.setSizes([470, 290])  # H6: room for the three telemetry plots
         middle = QWidget()
         mid = QVBoxLayout(middle)
         mid.setContentsMargins(0, 0, 0, 0)
@@ -606,6 +654,19 @@ class PitWallWindow(QMainWindow):
         self.trace_panel, layout = _panel("Battery", self.trace)
         self.trace_title = _label("", 8, color=TEXT_DIM)
         layout.insertWidget(1, self.trace_title)
+
+    def _build_telemetry(self) -> None:
+        """H6: Our Car's speed / throttle / battery vs lap distance, previous-lap ghost."""
+        self.telemetry = TelemetryPlot(float(self.session.engine.trk.length_m))
+        self.telemetry_panel = QFrame()  # no panel header: the widget has its own title line
+        self.telemetry_panel.setStyleSheet(f"QFrame {{ background:{PANEL}; border-radius:4px; }}")
+        box = QVBoxLayout(self.telemetry_panel)
+        box.setContentsMargins(6, 4, 6, 4)
+        box.addWidget(self.telemetry)
+        self.trace_tabs = QTabWidget()
+        self.trace_tabs.addTab(self.trace_panel, "Battery")
+        self.trace_tabs.addTab(self.telemetry_panel, "Telemetry")
+        self.trace_tabs.currentChanged.connect(lambda _: self.telemetry.redraw(force=True))
 
     def _build_alerts(self) -> None:
         self.alert_box = QWidget()
@@ -844,6 +905,7 @@ class PitWallWindow(QMainWindow):
         view = frame.view
         self._draw_map(frame)
         self._remember(frame)
+        self.telemetry.add(view)  # H6: append only; drawn at the table rate below
         self._draw_status(frame)
         self._draw_alerts(frame)
         self._draw_radio(frame)
@@ -853,6 +915,7 @@ class PitWallWindow(QMainWindow):
             self._draw_radar(frame)
             self._draw_strategy(frame)
             self._draw_trace(frame)
+            self.telemetry.redraw()
             self._last_table = now
         state = "FINISHED" if frame.finished else (
             "PAUSED ON ALERT" if frame.paused_on_alert else self._speed_name)  # fmt: skip
