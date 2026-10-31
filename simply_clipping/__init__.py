@@ -12,12 +12,14 @@ SC-R02).
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 from simply_clipping.alerts import no_alerts
 from simply_clipping.energy import prior_estimates
 from simply_clipping.live import Provider, create
-from simply_clipping.loader import load_config, load_feed, load_layout
+from simply_clipping.loader import Track, car_inputs, load_config, load_feed, load_layout
+from simply_clipping.physics import aero_modes, fit_cda, stream_car
 
 __all__ = ["Provider", "create", "run"]
 
@@ -25,14 +27,15 @@ __all__ = ["Provider", "create", "run"]
 def run(
     feed_dir: Path, out_dir: Path, our: str | None, own_file: Path | None, layout_file: Path
 ) -> None:
-    """Offline (the bench): one race's public feed in, estimates and alerts out.
-
-    Scaffold (SC-0): P1 load and P10 write only; the estimates are the config prior
-    and there are no alerts yet. Each SC task fills in its pipeline steps.
-    """
+    """Offline (the bench): one race's public feed in, estimates and alerts out."""
     cfg = load_config()
     feed = load_feed(feed_dir)
-    load_layout(layout_file)  # P5 / P8 / P9 use the zones and corners (SC-2 on)
+    track = Track.from_layout(load_layout(layout_file))
+    cda: dict[str, dict[str, float | None]] = {}
+    for driver, car in car_inputs(feed, track.length_m).items():
+        fit = fit_cda(stream_car(car, cfg), track, cfg)
+        cda[driver] = {mode: fit.fitted(mode) for mode in aero_modes(cfg)}
+    (out_dir / "cda_fit.json").write_text(json.dumps(cda, indent=1), encoding="utf-8")
     prior_estimates(feed.cars, cfg).to_parquet(out_dir / "estimates.parquet", index=False)
     if our is not None:
         no_alerts().to_parquet(out_dir / "alerts.parquet", index=False)

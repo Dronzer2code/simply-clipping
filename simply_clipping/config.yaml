@@ -13,7 +13,7 @@ signal:
   max_gap_s: 0.5 # RADAR: no interpolation across gaps longer than this
 
 car:
-  mass_kg: 800.0 # RADAR (without fuel; fuel below, lesson L-d)
+  mass_kg: 768.0 # RULES minimum mass without fuel (the RADAR spec's 800 kg averaged fuel in; lesson L-d adds fuel below)
   rho_kg_m3: 1.18 # RADAR
   crr: 0.012 # RADAR
   g_ms2: 9.81
@@ -22,9 +22,9 @@ car:
   p_ice_kw_by_team: {} # TUNE (SC-1), lesson L-d: team_id -> kW, fitted on seeds 1-5 from public data
   p_elec_max_kw: 350.0 # RULES MGU-K maximum
 
-fuel: # lesson L-d: mass falls over the race
-  start_kg: null # TUNE (SC-1)
-  burn_kg_per_lap: null # TUNE (SC-1)
+fuel: # lesson L-d: mass falls over the race (linear burn, a full race distance)
+  start_kg: 90.0 # TUNE (SC-1): best CdA fit on seeds 1-5 among 90 / 110 / 130 kg
+  burn_kg_per_lap: 1.7 # TUNE (SC-1): start_kg over Suzuka's 53 laps
 
 taper: # RULES, lesson L-b: MGU-K power is cut with speed by regulation; that is not CLIP
   start_kmh: 290
@@ -40,10 +40,22 @@ states: # RADAR / BRIDGE state definitions (the scorer's state_true uses the sam
   clip_max_accel_ms2: 0.3 # "speed flat or falling"
   partial_deploy_kw: [150, 250] # lesson L-c: deploy levels seen on straights (SPRINT Part 5 partial_deploy)
 
-cda_fit:
-  straight_first_s: 2.0 # RADAR: full-throttle samples in the first 2 s of each straight
-  aero_modes: [straight, corner] # RADAR: one CdA per aero mode
-  assume_full_deploy: false # lesson L-c: the RADAR spec assumed 350 kW here; that is wrong
+cda_fit: # SC-1: per car per aero mode from full-throttle runs, no deploy assumption (lesson L-c)
+  aero_modes: [straight, corner] # RADAR: one CdA per aero mode (straight = a Straight Mode zone)
+  v_min_kmh: # TUNE (SC-1): below this a run can be grip-limited, not power-limited
+    straight: 230.0
+    corner: 150.0
+  v_max_kmh: 290.0 # owner SC-1: below the taper start (taper.start_kmh), so the taper cannot bias the fit
+  min_points: 15 # STRUCTURAL: a run needs 1.5 s of points
+  min_dv_kmh: 20.0 # STRUCTURAL: and a speed range to separate drag from power
+  trim_mad: 3.0 # robust fit: drop points more than 3 MADs off the run's line
+  trim_rounds: 2
+  min_runs: 3 # the prior is used until a mode has this many runs
+  cda_bounds_m2: {min: 0.2, max: 3.0} # STRUCTURAL: a run whose slope is outside is not drag
+  resid_floor_kw: 20.0 # STRUCTURAL: residual noise floor in a run's weight (one lucky fit cannot dominate)
+  prior_m2: # TUNE (SC-1): median fitted CdA over the tune set (330 fits per mode), used before a car has runs
+    straight: 0.77
+    corner: 1.62
 
 energy:
   e_min_mj: 0.0 # RADAR clamp
