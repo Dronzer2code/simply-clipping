@@ -113,9 +113,9 @@ battles:
 
 alerts: # RADAR / SPRINT Part 2
   attack_gap_s: 1.0
-  attack_margin_mj: 0.8
+  attack_margin_mj: 1.2 # owner 0.8; TUNE (SC-4): normal-race ATTACK precision 4 -> 13 % on seeds 1-5
   defend_gap_s: 0.6
-  defend_margin_mj: 0.8
+  defend_margin_mj: 1.2 # owner 0.8; TUNE (SC-4): DEFEND precision up, battles alerts 114 -> 85 per race
   repass_window_s: 15.0
   repass_our_max_mj: 1.0
   repass_straight_m: 600.0
@@ -127,7 +127,7 @@ alerts: # RADAR / SPRINT Part 2
   min_confidence: 0.4 # owner SC-3: energy branches need this rival confidence
   long_clip_s: 1.0 # TUNE (SC-3): a "long CLIP" on a straight (single CLIP points are noise)
   detection_min_share: 0.7 # TUNE (SC-3): observed-clip branches need this share of samples on the pass
-  need_share: 0.5 # TUNE (SC-3): DEFEND own battery: our battery below this share of the straight's need
+  need_share: 0.4 # TUNE (SC-3, SC-4): DEFEND own battery: our battery below this share of the straight's need
   straight_speed_kmh: 270.0 # TUNE (SC-3): the need = straight length at this speed x MGU-K max
   closing_on_straight: true # TUNE (SC-3): CLOSING-SPEED only with Our Car on a straight (acceleration zone)
   closing_counts_no_deploy: false # TUNE (SC-3): the slow car may also be at full throttle without deploy (empty)

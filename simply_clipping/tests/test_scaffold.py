@@ -50,7 +50,7 @@ def test_config_has_every_section_and_names_missing_keys() -> None:
     for section in ("signal", "car", "fuel", "taper", "states", "cda_fit", "energy", "anchor",
                     "confidence", "battles", "alerts", "output"):  # fmt: skip
         assert section in cfg, section
-    assert const(cfg, "alerts.attack_margin_mj") == 0.8
+    assert const(cfg, "alerts.repass_our_max_mj") == 1.0
     with pytest.raises(KeyError, match="alerts.nope"):
         const(cfg, "alerts.nope")
 
