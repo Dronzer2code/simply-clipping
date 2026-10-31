@@ -748,6 +748,44 @@ class RadioConfig(StrictModel):
     reply_timeout_s: Positive
 
 
+class RadioLlmConfig(StrictModel):
+    """Hosted LLM on the team radio (hackathon H2 commands, H3 driver replies).
+
+    ``provider`` null = off: the keyword parser and the reply templates only.
+    """
+
+    model_config = ConfigDict(extra="forbid", protected_namespaces=())
+
+    provider: Literal["openai", "anthropic"] | None = None
+    """Owner decision (open): which hosted API the radio calls."""
+    model: str | None = None
+    api_key_env: str | None = None
+    """Name of the environment variable holding the key (never the key itself)."""
+    base_url: str | None = None
+    """Optional endpoint override (an OpenAI-compatible server, a proxy)."""
+    timeout_s: Positive = 2.0
+    """Owner H2: no answer within this many wall seconds -> keyword parser."""
+    driver_replies: bool = True
+    """H3: let the LLM write the driver's unprompted lines (fact-checked)."""
+    max_reply_words: int = Field(default=20, ge=1)
+    """H3: longer replies fall back to the template."""
+
+
+class VoiceInputConfig(StrictModel):
+    """Push-to-talk speech-to-text (hackathon H2, local faster-whisper)."""
+
+    enabled: bool = True
+    model: str = "base.en"
+    """faster-whisper model name (``tiny.en`` is faster, ``base.en`` more accurate)."""
+    model_dir: str = "models/stt"
+    """Download / cache directory (gitignored), relative to the repository root."""
+    compute_type: str = "int8"
+    max_record_s: Positive = 15.0
+    """A longer hold is cut here."""
+    key: str = "`"
+    """Hold this key to talk (the button works too)."""
+
+
 class CalibrationConfig(StrictModel):
     """Calibration pass thresholds (F20)."""
 
@@ -830,4 +868,6 @@ class AppConfig(StrictModel):
     predictor: PredictorConfig
     debrief: DebriefConfig
     radio: RadioConfig
+    radio_llm: RadioLlmConfig = RadioLlmConfig()
+    voice_input: VoiceInputConfig = VoiceInputConfig()
     calibration: CalibrationConfig

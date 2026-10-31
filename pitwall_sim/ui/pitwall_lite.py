@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import time
 from collections import deque
+from pathlib import Path
 from typing import Any
 
 import numpy as np
@@ -50,6 +51,7 @@ from pitwall_sim.engineer.commands import CommandType
 from pitwall_sim.live.reveal import OFF_MJ, RevealData
 from pitwall_sim.live.session import Frame, LiveSession
 from pitwall_sim.observe.alerts import Alert
+from pitwall_sim.radio import stt
 from pitwall_sim.radio.voice import DriverVoice, available
 
 #: docs/spec/UI_DESIGN.md COLOURS.
@@ -687,13 +689,100 @@ class PitWallWindow(QMainWindow):
         col.setContentsMargins(0, 0, 0, 0)
         col.addWidget(self.radio_list, 1)
         col.addWidget(self.radio_input)
+        col.addWidget(self._build_voice_input())
         self.radio_panel, _ = _panel("Radio", box)
+
+    def _build_voice_input(self) -> QWidget:
+        """H2: push-to-talk (local speech-to-text) and which path understood the message."""
+        cfg = self.session.engine.app.voice_input
+        ok, why = stt.status() if cfg.enabled else (False, "Voice input is off in app.yaml")
+        self.talk_key = cfg.key
+        self.talk_button = QPushButton(f"Hold to talk  [{cfg.key}]")
+        self.talk_button.setEnabled(ok)
+        self.talk_button.setToolTip(why)
+        self.radio_via = _label("", 8, True, TEXT_DIM)
+        self._radio_via_shown = ""
+        self.radio_via.setToolTip("Which path understood the last message: LLM, keyword parser")
+        self.ptt: stt.PushToTalk | None = None
+        if ok:
+            model_dir = Path(cfg.model_dir)
+            if not model_dir.is_absolute():
+                model_dir = Path(self.session.config_dir).resolve().parent / model_dir
+            names = [n for c in self.session.engine.track.corners for n in (c.name, *c.aliases)]
+            prompt = stt.RADIO_WORDS + "Corners: " + ", ".join(names) + "."
+            self.voice_bridge = VoiceBridge()
+            self.voice_bridge.text.connect(self.voice_text)
+            self.voice_bridge.error.connect(self.voice_error)
+            self.ptt = stt.PushToTalk(
+                stt.WhisperTranscriber(cfg.model, model_dir, cfg.compute_type, prompt),
+                stt.SoundDeviceRecorder(cfg.max_record_s),
+                self.voice_bridge.text.emit, self.voice_bridge.error.emit,
+            )  # fmt: skip
+            self.talk_button.pressed.connect(self.talk_down)
+            self.talk_button.released.connect(self.talk_up)
+            self.radio_input.installEventFilter(self)  # the key also works while typing
+        row = QWidget()
+        line = QHBoxLayout(row)
+        line.setContentsMargins(0, 0, 0, 0)
+        line.addWidget(self.talk_button)
+        line.addWidget(self.radio_via, 1)
+        return row
+
+    def talk_down(self) -> None:
+        """Start recording the engineer (push-to-talk held)."""
+        if self.ptt is not None and self.ptt.press():
+            self.ptt.preload()
+            self.talk_button.setText("Listening...")
+
+    def talk_up(self) -> None:
+        """Stop recording; the words are transcribed in the background."""
+        if self.ptt is not None and self.ptt.recording:
+            self.ptt.release()
+            self.talk_button.setText("Transcribing...")
+
+    def voice_text(self, text: str) -> None:
+        """Transcribed words: into the same pipeline as typed radio (UI thread)."""
+        self.talk_button.setText(f"Hold to talk  [{self.talk_key}]")
+        self.session.radio_send(text, "VOICE")
+
+    def voice_error(self, message: str) -> None:
+        """Voice failed: say so; typing stays."""
+        self.talk_button.setText(f"Hold to talk  [{self.talk_key}]")
+        self.radio_via.setText(f"VOICE: {message}")
+
+    def _talk_key(self, event: Any) -> bool:
+        """Hold-to-talk key press / release; return whether the event was ours."""
+        if self.ptt is None or event.text() != self.talk_key:
+            return False
+        if event.isAutoRepeat():
+            return True
+        if event.type() == event.Type.KeyPress:
+            self.talk_down()
+        else:
+            self.talk_up()
+        return True
+
+    def eventFilter(self, watched: Any, event: Any) -> bool:  # noqa: N802 (Qt)
+        """Catch the talk key inside the radio box (it would otherwise be typed)."""
+        if event.type() in (event.Type.KeyPress, event.Type.KeyRelease) and self._talk_key(event):
+            return True
+        return bool(super().eventFilter(watched, event))
+
+    def keyPressEvent(self, event: Any) -> None:  # noqa: N802 (Qt)
+        """Hold the talk key anywhere in the window."""
+        if not self._talk_key(event):
+            super().keyPressEvent(event)
+
+    def keyReleaseEvent(self, event: Any) -> None:  # noqa: N802 (Qt)
+        """Release the talk key: transcribe."""
+        if not self._talk_key(event):
+            super().keyReleaseEvent(event)
 
     def send_radio(self) -> None:
         """Send the typed radio message to the driver (H2)."""
         text = self.radio_input.text().strip()
         if text:
-            self.session.radio_message(text)
+            self.session.radio_send(text)  # LLM (worker) -> keyword parser -> "Say again?"
             self.radio_input.clear()
 
     def _build_controls(self) -> None:
@@ -1017,6 +1106,11 @@ class PitWallWindow(QMainWindow):
             card.set_remaining(frame.view.t_s)
 
     def _draw_radio(self, frame: Frame) -> None:
+        via = self.session.radio_path
+        if via != self._radio_via_shown:
+            self._radio_via_shown = via
+            llm = self.session.radio_ai.name
+            self.radio_via.setText(f"Understood by: {via}" + (f"  ({llm})" if "LLM" in via else ""))
         lines = frame.radio
         if len(lines) == self._radio_count:
             return
@@ -1035,3 +1129,10 @@ class PitWallWindow(QMainWindow):
         self.thread_.wait(2000)
         self.session.close()
         super().closeEvent(event)
+
+
+class VoiceBridge(QObject):
+    """Hands push-to-talk results from the speech worker to the UI thread (H2)."""
+
+    text = Signal(str)
+    error = Signal(str)
