@@ -10,6 +10,7 @@ Repository rules for agents stay in `CLAUDE.md` at the repository root.
 ```text
 docs/
 ├── README.md                     this index
+├── COLLAB_SUMMARY.md             one-page project summary for collaborators: setup, status, open items
 ├── PITCH.md                      plain-language pitch for judges: the idea, every feature, results
 ├── HACKATHON_SCOPE.md            what the hackathon builds (H1-H8, E1-E3), fallbacks, done checklist
 ├── spec/        what to build (stable requirements and contracts)
