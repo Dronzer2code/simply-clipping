@@ -108,8 +108,9 @@ def test_speed_buttons(qtbot: QtBot, speed: str) -> None:
     window.close()
 
 
-def test_call_summary_opens_at_the_flag(qtbot: QtBot) -> None:
+def test_call_summary_opens_at_the_flag(qtbot: QtBot, tmp_path: Path) -> None:
     window, session = _window(qtbot, laps=2, preset="repass", test_mode=True)
+    window.graph_root = tmp_path  # Graphify track: the race graph is written at the flag
     window.set_speed("16x")
     qtbot.waitUntil(lambda: window.summary_dialog is not None, timeout=60000)
     dialog = window.summary_dialog
@@ -125,6 +126,16 @@ def test_call_summary_opens_at_the_flag(qtbot: QtBot) -> None:
     assert reveal.table.rowCount() == len(session.call_log)
     assert all(reveal.table.item(r, cost).text() == "computing…"
                for r in range(reveal.table.rowCount()))  # fmt: skip
+    panel = dialog.graph_panel  # race graph + dashboard, built in the background
+    assert panel is not None
+    qtbot.waitUntil(lambda: panel.open_graph.isEnabled(), timeout=30000)
+    assert panel.open_dashboard.isEnabled() and "ready" in panel.status.text()
+    assert panel.paths["graph"].exists() and panel.paths["dashboard"].exists()
+    assert panel.paths["graph"].parent.parent == tmp_path
+    panel.question.setEditText("Who did I race most?")
+    panel.ask()
+    qtbot.waitUntil(lambda: panel.answer.toPlainText() not in ("", "Thinking..."), timeout=30000)
+    assert panel.answer.toPlainText().startswith(("Rivals you raced most", "You never ran"))
     dialog.close()
     window.close()
 

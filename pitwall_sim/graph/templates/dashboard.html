@@ -214,8 +214,8 @@ document.getElementById('accuracy').innerHTML = acc.length ? acc.map(a => {
 }).join('') : '<div class="controls">Our Car never ran within 1 s of another car.</div>';
 document.querySelectorAll('.acc-row').forEach(el => el.onclick = () => {
   const k = CARS.findIndex(c => c.id === el.dataset.id); if (k >= 0) showCar(k); });
-showCar(OUR);
-highlight(null);  // open on the whole field; a click focuses one car
+const start = CARS.findIndex(c => c.code === HASH.get('car'));  // e.g. dashboard.html#car=ANT
+if (start >= 0) showCar(start); else { showCar(OUR); highlight(null); }  // whole field; a click focuses
 </script>
 </body>
 </html>

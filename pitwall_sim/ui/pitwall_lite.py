@@ -56,6 +56,7 @@ from pitwall_sim.live.session import Frame, LiveSession
 from pitwall_sim.observe.alerts import Alert
 from pitwall_sim.radio import stt
 from pitwall_sim.radio.voice import DriverVoice, available
+from pitwall_sim.ui.race_graph_panel import OUT_ROOT, GraphWorker, RaceGraphPanel
 from pitwall_sim.ui.telemetry_plot import TelemetryPlot
 
 #: docs/spec/UI_DESIGN.md COLOURS.
@@ -273,7 +274,8 @@ class AlertCard(QFrame):
 class SummaryDialog(QDialog):
     """End-of-race call summary (A-4): every alert, the call, what followed."""
 
-    def __init__(self, session: LiveSession, parent: QWidget | None = None) -> None:
+    def __init__(self, session: LiveSession, parent: QWidget | None = None,
+                 graph_root: Path = OUT_ROOT) -> None:  # fmt: skip
         """Fill the table from the session's call records."""
         super().__init__(parent)
         summary = session.summary()
@@ -321,6 +323,9 @@ class SummaryDialog(QDialog):
         reveal = session.reveal()
         self.reveal_tab: RevealTab | None = None
         self.cost_worker: CostWorker | None = None
+        self.graph_worker: GraphWorker | None = None
+        self.graph_panel: RaceGraphPanel | None = None
+        self._graph_again = self._closing = False
         if reveal is not None:  # only after the flag (truth allowed then)
             self.reveal_tab = RevealTab(reveal, session.drivers)
             self.tabs.addTab(self.reveal_tab, "Reveal")
@@ -331,6 +336,18 @@ class SummaryDialog(QDialog):
                 self.cost_worker = CostWorker(session, self)
                 self.cost_worker.done.connect(self.reveal_tab.set_cost)
                 self.cost_worker.start()
+            # Graphify track: race graph + dashboard in the background, again with the costs
+            self.graph_panel = RaceGraphPanel(self.reveal_tab)
+            tab_layout = self.reveal_tab.layout()
+            assert isinstance(tab_layout, QVBoxLayout)
+            tab_layout.insertWidget(2, self.graph_panel)
+            self.graph_worker = GraphWorker(session, graph_root, self)
+            self.graph_worker.ready.connect(self.graph_panel.set_ready)
+            self.graph_worker.failed.connect(self.graph_panel.set_failed)
+            self.graph_worker.finished.connect(self._graph_finished)
+            self.graph_worker.start()
+            if self.cost_worker is not None:
+                self.cost_worker.finished.connect(self._costs_in)
         layout = QVBoxLayout(self)
         layout.addWidget(_label("CALL SUMMARY", 11, True))
         layout.addWidget(self.tabs)
@@ -338,11 +355,30 @@ class SummaryDialog(QDialog):
         if self.reveal_tab is not None:
             self.tabs.setCurrentWidget(self.reveal_tab)
 
+    def _costs_in(self) -> None:
+        """Every decision cost is in: build the race graph again, with them."""
+        if self.graph_worker is None or self._closing:
+            return
+        if self.graph_worker.isRunning():
+            self._graph_again = True
+        else:
+            self.graph_worker.start()
+
+    def _graph_finished(self) -> None:
+        if self._graph_again and self.graph_worker is not None and not self._closing:
+            self._graph_again = False
+            self.graph_worker.start()
+
     def closeEvent(self, event: Any) -> None:  # noqa: N802 (Qt)
-        """Stop the cost worker."""
+        """Stop the cost worker; wait for the race graph and a question in progress."""
+        self._closing = True
         if self.cost_worker is not None:
             self.cost_worker.stop()
             self.cost_worker.wait(30000)
+        if self.graph_worker is not None:
+            self.graph_worker.wait(30000)
+        if self.graph_panel is not None:
+            self.graph_panel.stop()
         super().closeEvent(event)
 
 
@@ -519,6 +555,9 @@ class RevealTab(QWidget):
 
 class PitWallWindow(QMainWindow):
     """The live race window."""
+
+    graph_root: Path = OUT_ROOT
+    """Where the race graph and dashboard go at the flag (``<root>/<run_id>``)."""
 
     def __init__(self, session: LiveSession, start_speed: str = "1x") -> None:
         """Build the panels and start the sim thread."""
@@ -1008,7 +1047,7 @@ class PitWallWindow(QMainWindow):
 
     def show_summary(self) -> None:
         """Open the call summary (A-4); complete once the race is over."""
-        self.summary_dialog = SummaryDialog(self.session, self)
+        self.summary_dialog = SummaryDialog(self.session, self, self.graph_root)
         self.summary_dialog.show()
 
     def answer(self, alert_id: str, key: int) -> None:

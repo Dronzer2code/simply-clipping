@@ -14,6 +14,8 @@ import pandas as pd
 import pytest
 
 from pitwall_sim.engineer.records import CallCost
+from pitwall_sim.graph import ask as ask_mod
+from pitwall_sim.graph.ask import RACED_MOST, WRONG_ALERTS, answer, ask, preset_questions
 from pitwall_sim.graph.dashboard import ACCURACY_SCALE_MJ, dashboard_data
 from pitwall_sim.graph.race import graph_session, simulate
 from pitwall_sim.graph.race_graph import (
@@ -181,6 +183,27 @@ def test_dashboard_agrees_with_the_graph(race: Any, tmp_path: Path) -> None:
     assert (paths.folder / "lib" / "d3.min.js").stat().st_size > 100_000
 
 
+def test_ask_the_pit_wall_presets(race: Any, tmp_path: Path,
+                                  monkeypatch: pytest.MonkeyPatch) -> None:  # fmt: skip
+    _, record, _ = race
+    presets = preset_questions(record)
+    assert presets[:2] == [RACED_MOST, WRONG_ALERTS] and len(presets) == 3
+    stats = rival_stats(record)
+    top = max(stats, key=lambda d: stats[d]["time_within_1s_s"])
+    raced = answer(record, RACED_MOST)
+    assert raced is not None and f"- {top}: {stats[top]['time_within_1s_s']:.0f} s" in raced
+    wrong = answer(record, WRONG_ALERTS)
+    judged = [a for a in record.alerts if a.truth.right is not None]
+    n_wrong = sum(not a.truth.right for a in judged)
+    assert wrong is not None and wrong.startswith(f"{n_wrong} of {len(judged)} checked alerts")
+    calls = answer(record, presets[2])
+    assert calls is not None and ("Total:" in calls or "no calls" in calls)
+    assert answer(record, "who won the race?") is None  # not a preset: graphify's job
+    monkeypatch.setattr(ask_mod.shutil, "which", lambda _: None)  # graphify not installed
+    assert "graphify is not installed" in ask(record, tmp_path / "graph.json", "who won?")
+    assert ask(record, tmp_path / "graph.json", RACED_MOST) == raced  # presets still work
+
+
 @pytest.mark.skipif(shutil.which("graphify") is None, reason="graphify CLI not installed")
 def test_graphify_reads_our_graph(race: Any, tmp_path: Path) -> None:
     _, record, _ = race
@@ -188,6 +211,8 @@ def test_graphify_reads_our_graph(race: Any, tmp_path: Path) -> None:
     done = subprocess.run(["graphify", "explain", OUR, "--graph", str(paths.graph_json)],
                           capture_output=True, text=True, timeout=60, check=False)  # fmt: skip
     assert done.returncode == 0 and "battled" in done.stdout, done.stdout + done.stderr
+    text = ask(record, paths.graph_json, f"which alerts were about {OUR}")
+    assert "NODE" in text or "Nothing in the race graph" in text, text
 
 
 def test_judge_and_battles_rules() -> None:

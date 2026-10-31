@@ -108,9 +108,9 @@ function nodeStyle(n) {
   const kind = n.file_type, comm = COLOURS[n.community] || '#888';
   if (kind === 'car') {
     const us = !!n.our_car, team = n.color || '#888';
-    return { label: us ? n.label + ' (YOU)' : n.label, shape: 'dot', size: us ? 34 : 14 + Math.min(14, Math.sqrt((n.stats && n.stats.time_within_1s_s) || 0)),
+    return { label: us ? n.label + ' (YOU)' : n.label, shape: 'dot', size: us ? 44 : 18 + Math.min(16, Math.sqrt((n.stats && n.stats.time_within_1s_s) || 0)),
              color: { background: team, border: us ? '#ffffff' : comm, highlight: { background: '#fff', border: team } },
-             borderWidth: us ? 4 : 3, font: { size: us ? 18 : 13, color: '#fff', strokeWidth: 3, strokeColor: '#0f0f1a', bold: us } ,
+             borderWidth: us ? 4 : 3, font: { size: us ? 24 : 17, color: '#fff', strokeWidth: 4, strokeColor: '#0f0f1a', bold: us },
              x: us ? 0 : undefined, y: us ? 0 : undefined, fixed: us ? { x: true, y: true } : false, mass: us ? 6 : 2 };
   }
   if (kind === 'battle' && !n.our_battle) {  // other cars' battles: a dot, details on hover
@@ -125,6 +125,10 @@ function nodeStyle(n) {
            shapeProperties: { borderRadius: 3 } };
 }
 const nodesDS = new vis.DataSet(G.nodes.map(n => Object.assign({ id: n.id, raw: n, group: n.community, title: n.label }, nodeStyle(n))));
+// Battles between two other cars are summed up by their "battled" link: off until asked for.
+let showOther = false;
+const isOther = n => n.file_type === 'battle' && !n.our_battle;
+const nodesView = new vis.DataView(nodesDS, { filter: item => showOther || !isOther(item.raw) });
 const edgesDS = new vis.DataSet(G.links.map((l, i) => {
   const battle = l.relation === 'battled', pass = l.relation === 'passed', inferred = l.confidence === 'INFERRED';
   return { id: 'e' + i, from: l.source, to: l.target, raw: l, title: l.relation + (battle ? ' ' + l.seconds + ' s' : pass ? ' x' + l.count : '') + ' [' + l.confidence + (inferred ? ' ' + l.confidence_score : '') + ']',
@@ -134,7 +138,7 @@ const edgesDS = new vis.DataSet(G.links.map((l, i) => {
            smooth: { type: 'continuous' }, length: battle ? 120 + 400 / (1 + l.weight / 20) : 70 };
 }));
 const container = document.getElementById('graph');
-const network = new vis.Network(container, { nodes: nodesDS, edges: edgesDS }, {
+const network = new vis.Network(container, { nodes: nodesView, edges: edgesDS }, {
   physics: { solver: 'forceAtlas2Based', forceAtlas2Based: { gravitationalConstant: -60, centralGravity: 0.006, springLength: 90, springConstant: 0.06, avoidOverlap: 0.4 },
              stabilization: { iterations: 400, fit: false } },
   interaction: { hover: true, tooltipDelay: 120, hideEdgesOnDrag: true }, layout: { improvedLayout: G.nodes.length < 400 },
@@ -143,6 +147,9 @@ network.once('stabilizationIterationsDone', () => {
   network.setOptions({ physics: { enabled: false } });
   network.fit({ animation: false });
   if (ourNode) network.moveTo({ position: { x: 0, y: 0 }, scale: network.getScale() * 0.92 });  // Our Car in the middle
+  const focusCode = new URLSearchParams(location.hash.slice(1)).get('focus');  // e.g. graph.html#focus=ANT
+  const target = focusCode && G.nodes.find(n => n.file_type === 'car' && n.label === focusCode);
+  if (target) { network.selectNodes([target.id]); showInfo(target.id); }
 });
 
 document.getElementById('title').innerHTML = '<b>' + esc(ourNode ? ourNode.label : RACE.our) + '</b> vs every rival &middot; ' +
@@ -193,7 +200,7 @@ const search = document.getElementById('search'), results = document.getElementB
 search.addEventListener('input', () => {
   const q = search.value.trim().toLowerCase();
   if (!q) { results.style.display = 'none'; return; }
-  const hits = G.nodes.filter(n => n.label.toLowerCase().includes(q)).slice(0, 30);
+  const hits = G.nodes.filter(n => (showOther || !isOther(n)) && n.label.toLowerCase().includes(q)).slice(0, 30);
   results.innerHTML = hits.map(n => '<div class="search-item" data-nid="' + esc(n.id) + '">' + esc(n.label) + '</div>').join('') || '<div class="search-item">no match</div>';
   results.style.display = 'block';
   results.querySelectorAll('[data-nid]').forEach(el => el.onclick = () => { focusNode(el.dataset.nid); results.style.display = 'none'; });
@@ -204,10 +211,19 @@ function applyFilters() {
   nodesDS.update(G.nodes.map(n => ({ id: n.id, hidden: !n.our_car && (hiddenComm.has(n.community) || hiddenType.has(n.file_type)) })));
 }
 const counts = {}, typeCounts = {};
-G.nodes.forEach(n => { counts[n.community] = (counts[n.community] || 0) + 1; typeCounts[n.file_type] = (typeCounts[n.file_type] || 0) + 1; });
+G.nodes.forEach(n => { counts[n.community] = (counts[n.community] || 0) + 1; if (!isOther(n)) typeCounts[n.file_type] = (typeCounts[n.file_type] || 0) + 1; });
+const nOther = G.nodes.filter(isOther).length;
 document.getElementById('types').innerHTML = Object.keys(TYPE_NAMES).filter(t => typeCounts[t]).map(t =>
-  '<label><input type="checkbox" data-type="' + t + '" checked>' + TYPE_NAMES[t] + ' (' + typeCounts[t] + ')</label>').join('');
-document.querySelectorAll('#types input').forEach(cb => cb.onchange = () => {
+  '<label><input type="checkbox" data-type="' + t + '" checked>' + (t === 'battle' ? 'Your battles' : TYPE_NAMES[t]) + ' (' + typeCounts[t] + ')</label>').join('') +
+  (nOther ? '<label><input type="checkbox" id="other-battles">Battles between other cars (' + nOther + ')</label>' : '');
+const otherBox = document.getElementById('other-battles');
+if (otherBox) otherBox.onchange = () => {
+  showOther = otherBox.checked; nodesView.refresh();
+  network.setOptions({ physics: { enabled: true } });
+  network.once('stabilized', () => network.setOptions({ physics: { enabled: false } }));
+  network.stabilize(150);
+};
+document.querySelectorAll('#types input[data-type]').forEach(cb => cb.onchange = () => {
   cb.checked ? hiddenType.delete(cb.dataset.type) : hiddenType.add(cb.dataset.type); applyFilters(); });
 const comms = G.graph.communities;
 document.getElementById('legend').innerHTML = Object.keys(comms).map(c =>

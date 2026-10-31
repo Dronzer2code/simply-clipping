@@ -61,6 +61,27 @@ Start race, **16x**. Optional: tick **Driver voice** (team-radio voice, offline)
   next lap)". The Safety Car stop shows a cost against "not sent": the cost looks
   2 laps ahead, so it sees the time of the stop, not the fresher tyres later. Say it.
 
+## Graphify moment (45 s, right after the Reveal)
+
+Every race becomes a graph of Our Car against every rival after the flag (built in
+the background: the Reveal tab says "Race graph ready", then again once the costs
+are in). Numbers below are the headless rehearsal with the calls above
+(`python -m pitwall_sim.graph.race --simulate --seed 2 --laps 15 --our GAS --sc-lap 7`);
+a live race moves a little with your exact calls.
+
+| Time | On screen | Say / do |
+| --- | --- | --- |
+| 0 s | Reveal tab: **Open race dashboard** | "After the flag the whole race becomes a graph." Tiles: P5, 14 alerts (4 of 9 right per the truth), 11 calls, +8.3 s total call cost, radar error 1.11 MJ. |
+| 10 s | Chord diagram: every car on the ring, YOU at the top | "Who we raced: ANT, 614 s within a second of us, then BOR and COL." Click **ANT** on the ring (or its row on the right). |
+| 20 s | Rival read accuracy: ANT's bar is red (52 %), alerts right 0 of 2 | "We read ANT worst: the radar thought he was empty, 0.1 MJ. He had 2.5 MJ. Both attacks on him failed." |
+| 30 s | **Open race graph** (top right); search **ANT** | Our Car in the middle, ANT in our battle group "GAS-ANT-LIN +1 battle". Click the triangle **ATTACK ANT L7 (energy)**: checked by "Truth ANT L7: true 2.5 MJ, est 0.1 -> WRONG", answered by "Call L7: Attack now", followed by "no pass". |
+| 40 s | Back on the Reveal tab, **Ask the pit wall**: "Which alerts were wrong?" | "5 of 9 checked alerts were wrong", both ANT attacks among them. |
+
+Shortcuts: `dashboard.html#car=ANT` and `graph.html#focus=ANT` open with ANT
+selected. The graph is also a graphify graph:
+`graphify path "GAS" "ANT" --graph graphify-out/races/live_suzuka_s2_GAS_15l/graph.json --undirected`.
+Screenshots: `docs/screenshots/race_dashboard.png`, `docs/screenshots/race_graph.png`.
+
 Close with the roadmap (HACKATHON_SCOPE section 9).
 
 ## Fallbacks
@@ -71,3 +92,4 @@ Close with the roadmap (HACKATHON_SCOPE section 9).
 | The radio box ignores a message | The driver says "Say again?": use the buttons (BOX, ATTACK, PUSH / HARVEST). |
 | The strategy panel is slow | Press Refresh, or skip that line; it never slows the race. |
 | The live demo fails | Replay viewer on seed 2 (`python -m pitwall_sim.viewer --seed 2`), or the backup video. |
+| The race graph is not ready / the browser does not open | Open the rehearsal's files directly: `graphify-out/races/live_suzuka_s2_GAS_15l/dashboard.html` (make them before going on stage with the command above, about 1 minute), or show the two screenshots. |
