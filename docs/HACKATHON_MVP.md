@@ -1,4 +1,8 @@
-# Pit Wall: Hackathon Scope
+# Pit Wall: Hackathon MVP
+
+> **Made for race strategists.** You read the race and make the calls while it runs.
+> After the flag, Simply Clipping and Graphify score and analyse every decision you
+> made, so your decisions, your driver calls and your strategy get better race by race.
 
 Based on `PROCESS_FLOW.md` status as of 2026-10-28 (commit `e426bb3`).
 Event time: 8 to 12 hours. Team builds with Claude Code (Max plan), so time estimates below are **agent-assisted** and include review and testing, not only writing code.
@@ -7,14 +11,35 @@ Items marked **Elevated** were raised above the previous version of this plan. E
 
 ## 1. The idea in short
 
-**Problem.** In 2026 F1, races are decided by battery energy. Each team knows its own battery but cannot see its rivals'. Real race engineers make calls (attack, defend, save, pit) from public timing and their own estimates. No game or tool lets you practise that job: they either show you everything or nothing.
+**Who it is for.** Race strategists, and race engineers learning the strategist's job.
 
-**Solution.** You are the race engineer of one car. You see your car in full and rivals only through a noisy public feed and a radar estimate of their battery. You talk to your driver on the radio, the AI driver carries out your calls, and the race reacts with rival strategies, Safety Cars and pit windows. After the flag, the true rival battery levels are revealed and every call you made gets a cost in seconds.
+**Problem.** In 2026 F1, races are decided by battery energy. A strategist knows their own car's battery but not the rivals'. Every call (attack, defend, save energy, pit, stay out under the Safety Car) is made from public timing and an estimate, under time pressure. Afterwards there is rarely a clear answer to "was that the right call, and why?". No tool lets a strategist practise those decisions and then review them, call by call, against what was really happening.
+
+**Solution.** The strategist runs the pit wall of one car through a full race. They read the race as it unfolds (public timing, a noisy telemetry feed, and an estimate of each rival's battery with its confidence) and make the decisions: driver calls on the radio, attack or defend, energy modes, the pit window, the Safety Car stop. The AI driver carries them out and the race reacts with rival strategies, Safety Cars and pit stops.
+
+After the chequered flag, every decision is scored and analysed:
+
+- **Simply Clipping** is the battery estimator the strategist reads during the race. It was tuned on simulated races (seeds 1-5) and tested on races it never saw (seeds 6-10). After the flag, every estimate and alert it gave is checked against the true batteries. The strategist sees which reads were right, which were wrong, and which wrong reads they acted on.
+- **Decision cost.** Each call is replayed from the moment it was made, against its alternatives, with paired random seeds. The result is the call's cost in seconds against the best option, and an engineer score out of 100.
+- **Graphify** turns the race into a graph of Our Car against every rival: who you battled, which alert led to which call, what each call led to, what it cost, and where the read was wrong. A race dashboard and "Ask the pit wall" questions ("Which alerts were wrong?", "What did my calls against ANT cost?") make the patterns easy to find.
+
+**What the strategist takes away.** Which rivals they misread, which kinds of calls cost them time, which driver calls worked. They carry that into the next race's strategy and calls.
+
+### The strategist's loop
+
+| Step | What happens | Built on |
+| --- | --- | --- |
+| 1. Read | Live timing, the noisy feed, each rival's battery estimate with its confidence, alerts with a one-line radio call | Information barrier, Simply Clipping |
+| 2. Decide | Driver calls on the radio or buttons, alert options, pit window from the strategy panel, the Safety Car call | Team radio, commands, strategy panel |
+| 3. Score | True batteries revealed; every estimate and alert checked; every call costed in seconds; engineer score | Reveal, decision-cost forks, engineer score |
+| 4. Analyse | Race graph and dashboard: rivals fought most, read accuracy per rival, call → outcome → cost chains, wrong reads | Graphify race graphs (`pitwall_sim/graph`) |
+| 5. Improve | The patterns to change next race: whom to trust, which calls to stop making, when to box | Race report, "Ask the pit wall" |
 
 **What the demo must show:**
-1. The hidden information (rival battery shown as an estimate with confidence).
-2. Making real pit wall calls under pressure (radio, alerts, Safety Car, pit window).
-3. The reveal after the race (estimate vs truth, and what each call cost or gained).
+1. Reading the race with hidden information (rival battery shown as an estimate with confidence).
+2. Making strategy decisions and driver calls under pressure (radio, alerts, Safety Car, pit window).
+3. The score after the race: estimate vs truth, and what each decision cost or gained.
+4. The analysis: the race graph and dashboard, and what the strategist would do differently next race.
 
 ## 2. Already built (we demo this as is)
 
@@ -39,11 +64,11 @@ Picked because each one completes the story and builds on code that already exis
 
 | # | Feature | Why it was picked | Builds on | Time |
 | --- | --- | --- | --- | --- |
-| H1 | Post-race Reveal and decision cost | The payoff of the idea. Judges see what was hidden and what each call was worth. | Call summary, snapshots, `call_outcome.py` | 2.5 h |
-| H2 | Team radio: talk to your driver | The live-demo hook. Feels like a real pit wall. | Command validation and queue | 2.5 h |
-| H3 | Driver radio replies with voice | F1 fans know team radio. Hearing the driver makes the demo memorable. | Radio log, alerts | 2 h |
-| H4 | Safety Car and VSC | The biggest strategy moment in real F1. Every F1 fan knows the "cheap pit stop" call. | Driver mistakes and retirements (inputs exist) | 3 h |
-| H5 | Strategy panel: pit window and undercut | Shows the engineer's tool of choice. Uses data taken only from radar estimates, so it respects the barrier. | Snapshot and fork | 2.5 h |
+| H1 | Post-race Reveal and decision cost | The payoff: the strategist's decisions are scored. Judges see what was hidden and what each call was worth. | Call summary, snapshots, `call_outcome.py` | 2.5 h |
+| H2 | Team radio: talk to your driver | Driver calls are half the strategist's job. The live-demo hook; feels like a real pit wall. | Command validation and queue | 2.5 h |
+| H3 | Driver radio replies with voice | The driver's feedback is information the strategist decides on. Hearing the driver makes the demo memorable. | Radio log, alerts | 2 h |
+| H4 | Safety Car and VSC | The biggest strategy decision in real F1. Every F1 fan knows the "cheap pit stop" call. | Driver mistakes and retirements (inputs exist) | 3 h |
+| H5 | Strategy panel: pit window and undercut | The strategist's main tool for the pit decision. Uses data taken only from radar estimates, so it respects the barrier. | Snapshot and fork | 2.5 h |
 | H6 | Pit wall UI upgrade | Makes the screen look like a real pit wall, not a prototype. | Lite UI | 2 h |
 | H7 | Realism pass | F1 judges will spot unrealistic numbers. | Overtake model, configs | 1.5 h |
 | H8 | Demo setup and rehearsal | One reliable, rehearsed race. | Presets, replay viewer | 1.5 h |
@@ -149,21 +174,24 @@ Independent of each other. Stop at any point.
 
 ## 8. Demo flow (4 minutes)
 
-1. Setup: Suzuka, Our Car in midfield, 15 laps, demo seed.
-2. Radar panel: "We can't see his battery, we only estimate it."
-3. Push-to-talk: "Save this lap, attack into turn 1 next lap." The driver answers on the radio and does it.
-4. The strategy panel shows the undercut window on the car ahead.
+1. Setup: Suzuka, Our Car in midfield, 15 laps, demo seed. "You are the strategist of this car."
+2. Read the race: "We can't see his battery. Simply Clipping estimates it, with a confidence."
+3. Driver call by push-to-talk: "Save this lap, attack into turn 1 next lap." The driver answers on the radio and does it.
+4. Pit decision: the strategy panel shows the undercut window on the car ahead.
 5. Safety Car. The driver radios it in. We box under the SC, some rivals stay out.
 6. A failed attack: the rival had more energy than we thought.
-7. Reveal: true battery against our estimate, and each call with its cost in seconds.
-8. Close with the roadmap.
+7. Score: the Reveal shows true battery against the estimate, each call with its cost in seconds, and the engineer score.
+8. Analyse: open the race dashboard and the race graph (Graphify). Who we raced most, the rival we read worst, and the chain alert → call → outcome → cost for the failed attack. "Next race: don't attack ANT on that read."
+9. Close with the roadmap.
 
 ## 9. Roadmap (last slide)
 
+- A strategist's progress across races: score and recurring mistakes tracked race to race (Graphify over many race graphs).
+- Simply Clipping trained and checked on real 2026 races.
 - Full calibration against real 2026 races.
 - On-device Gemma radio.
 - Full scored debrief with alternatives for every decision.
-- Replay real 2026 races and make your own calls against the real team.
+- Replay real 2026 races and make your own calls against the real team's.
 - All 2026 tracks, red flags and penalties.
 
 ## 10. Done checklist
@@ -172,6 +200,8 @@ Independent of each other. Stop at any point.
 - [ ] Safety Car or VSC happens on the demo seed, with rival pit decisions.
 - [ ] Strategy panel updates without slowing the race.
 - [ ] Reveal shows true vs estimated battery and a cost for each call.
+- [ ] The pit wall reads the rivals through Simply Clipping (`alerts.provider: external:simply_clipping` in `config/app.yaml`).
+- [ ] Race graph and dashboard open from the Reveal tab, and the analysis names what to change next race.
 - [ ] Radio commands work with no internet (keyword parser).
 - [ ] Barrier test still passes, including the new strategy panel (no rival truth before the flag outside Test mode).
 - [ ] Demo rehearsed 3 times and backup video recorded.
