@@ -301,8 +301,8 @@ def find_battles(t_s: Array, lap: Array, order: list[list[str]],
             if k == len(samples) or samples[k][0] - samples[k - 1][0] > MERGE_GAP_S:
                 first, last = samples[start], samples[k - 1]
                 battles.append(Battle(
-                    first[2], first[3], first[0], last[0], int(first[1]), int(last[1]),
-                    (k - start) * SAMPLE_S,
+                    first[2], first[3], first[0], last[0], max(1, int(first[1])),
+                    max(1, int(last[1])), (k - start) * SAMPLE_S,
                 ))  # fmt: skip
                 start = k
     battles.sort(key=lambda b: (b.start_t_s, b.cars))

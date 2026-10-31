@@ -428,7 +428,7 @@ def palette(cid: int) -> str:
 
 
 def write_race_graph(record: RaceRecord, out: Path) -> RaceGraphPaths:
-    """Write graph.json, labels.json, graph.html, race_report.md and race_record.json."""
+    """Write graph.json / .html, labels.json, dashboard.html, race_report.md, race_record.json."""
     out.mkdir(parents=True, exist_ok=True)
     lib = out / "lib"
     lib.mkdir(exist_ok=True)
@@ -448,7 +448,10 @@ def write_race_graph(record: RaceRecord, out: Path) -> RaceGraphPaths:
                     encoding="utf-8")  # fmt: skip
     report = out / "race_report.md"
     report.write_text(race_report(record), encoding="utf-8")
-    return RaceGraphPaths(out, graph_json, html, report, record_path)
+    from pitwall_sim.graph.dashboard import write_dashboard  # noqa: PLC0415 (it imports us)
+
+    board = write_dashboard(record, out)
+    return RaceGraphPaths(out, graph_json, html, report, record_path, board)
 
 
 def race_report(record: RaceRecord) -> str:

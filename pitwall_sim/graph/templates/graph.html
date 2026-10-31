@@ -13,7 +13,8 @@
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; display: flex; height: 100vh; overflow: hidden; }
-  #graph { flex: 1; position: relative; }
+  #wrap { flex: 1; position: relative; }
+  #graph { position: absolute; inset: 0; }
   #title { position: absolute; top: 10px; left: 14px; font-size: 13px; color: var(--text-2); z-index: 2; pointer-events: none; }
   #title b { color: var(--text); }
   #sidebar { width: 320px; background: var(--panel); border-left: 1px solid var(--border); display: flex; flex-direction: column; overflow: hidden; }
@@ -52,7 +53,7 @@
 </style>
 </head>
 <body>
-<div id="graph"><div id="title"></div></div>
+<div id="wrap"><div id="graph"></div><div id="title"></div></div>
 <div id="sidebar">
   <div id="links"><a href="dashboard.html">Race dashboard</a><a href="race_report.md">Race report</a></div>
   <div id="search-wrap">
@@ -102,8 +103,6 @@ const SKIP = new Set(['id', 'label', 'file_type', 'source_file', 'source_locatio
                       'stats', 'color', 'our_car', 'x', 'y']);
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const ourNode = G.nodes.find(n => n.our_car);
-const deg = {};
-G.links.forEach(l => { deg[l.source] = (deg[l.source] || 0) + 1; deg[l.target] = (deg[l.target] || 0) + 1; });
 
 function nodeStyle(n) {
   const kind = n.file_type, comm = COLOURS[n.community] || '#888';
@@ -113,6 +112,9 @@ function nodeStyle(n) {
              color: { background: team, border: us ? '#ffffff' : comm, highlight: { background: '#fff', border: team } },
              borderWidth: us ? 4 : 3, font: { size: us ? 18 : 13, color: '#fff', strokeWidth: 3, strokeColor: '#0f0f1a', bold: us } ,
              x: us ? 0 : undefined, y: us ? 0 : undefined, fixed: us ? { x: true, y: true } : false, mass: us ? 6 : 2 };
+  }
+  if (kind === 'battle' && !n.our_battle) {  // other cars' battles: a dot, details on hover
+    return { label: undefined, shape: 'dot', size: 5, color: { background: comm, border: comm, highlight: { background: '#fff', border: comm } } };
   }
   let bg = comm;
   if (kind === 'truthcheck') bg = n.right === true ? '#59A14F' : n.right === false ? '#E15759' : '#888';
@@ -134,10 +136,14 @@ const edgesDS = new vis.DataSet(G.links.map((l, i) => {
 const container = document.getElementById('graph');
 const network = new vis.Network(container, { nodes: nodesDS, edges: edgesDS }, {
   physics: { solver: 'forceAtlas2Based', forceAtlas2Based: { gravitationalConstant: -60, centralGravity: 0.006, springLength: 90, springConstant: 0.06, avoidOverlap: 0.4 },
-             stabilization: { iterations: 400 } },
+             stabilization: { iterations: 400, fit: false } },
   interaction: { hover: true, tooltipDelay: 120, hideEdgesOnDrag: true }, layout: { improvedLayout: G.nodes.length < 400 },
 });
-network.once('stabilizationIterationsDone', () => { network.setOptions({ physics: { enabled: false } }); network.fit({ animation: false }); });
+network.once('stabilizationIterationsDone', () => {
+  network.setOptions({ physics: { enabled: false } });
+  network.fit({ animation: false });
+  if (ourNode) network.moveTo({ position: { x: 0, y: 0 }, scale: network.getScale() * 0.92 });  // Our Car in the middle
+});
 
 document.getElementById('title').innerHTML = '<b>' + esc(ourNode ? ourNode.label : RACE.our) + '</b> vs every rival &middot; ' +
   esc(RACE.track_id) + ' &middot; seed ' + RACE.seed + ' &middot; ' + RACE.laps + ' laps' + (RACE.test_mode ? ' &middot; test mode' : '');

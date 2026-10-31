@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>__TITLE__</title>
+<script src="lib/d3.min.js"></script>
+<style>
+  :root {
+    --bg: #0f0f1a; --panel: #1a1a2e; --panel-2: #151527; --border: #2a2a4e; --input-border: #3a3a5e;
+    --text: #e0e0e0; --text-2: #aaa; --text-3: #ccc; --muted: #666; --accent: #4E79A7;
+    --good: #59A14F; --bad: #E15759; --warn: #EDC948; --you: #ffffff;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; min-height: 100vh; padding: 16px 18px 24px; }
+  header { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; margin-bottom: 14px; }
+  header h1 { font-size: 18px; font-weight: 600; }
+  header .meta { color: var(--text-2); font-size: 13px; flex: 1; }
+  .btn { background: var(--panel); color: var(--text-2); border: 1px solid var(--input-border); border-radius: 5px; padding: 5px 12px; font-size: 12px; text-decoration: none; cursor: pointer; }
+  .btn:hover, .btn.on { color: #fff; border-color: var(--accent); }
+  .btn.on { background: var(--accent); }
+  #tiles { display: grid; grid-template-columns: repeat(6, minmax(120px, 1fr)); gap: 10px; margin-bottom: 14px; }
+  .tile { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; }
+  .tile .k { font-size: 11px; color: var(--text-2); text-transform: uppercase; letter-spacing: .06em; }
+  .tile .v { font-size: 26px; font-weight: 600; margin-top: 4px; font-variant-numeric: tabular-nums; }
+  .tile .s { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .good { color: var(--good); } .bad { color: var(--bad); }
+  #main { display: grid; grid-template-columns: minmax(520px, 1.35fr) minmax(340px, 1fr); gap: 14px; }
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 14px; }
+  .card h2 { font-size: 12px; color: var(--text-2); text-transform: uppercase; letter-spacing: .06em; margin-bottom: 10px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .card h2 .grow { flex: 1; }
+  .controls { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-bottom: 6px; font-size: 12px; color: var(--text-2); }
+  .controls label { display: flex; align-items: center; gap: 5px; cursor: pointer; margin-left: 8px; }
+  #chord { width: 100%; height: min(64vh, 660px); display: block; }
+  #chord .ribbon { mix-blend-mode: screen; transition: opacity .15s; }
+  #chord text { fill: var(--text-3); font-size: 11px; }
+  #chord text.you { fill: var(--you); font-weight: 700; font-size: 14px; }
+  #hint { font-size: 11px; color: var(--muted); text-align: center; margin-top: 2px; }
+  #detail { margin-top: 12px; background: var(--panel-2); border: 1px solid var(--border); border-radius: 6px; padding: 10px 12px; font-size: 13px; min-height: 60px; }
+  #detail table { width: 100%; border-collapse: collapse; margin-top: 6px; font-size: 12px; }
+  #detail td { padding: 3px 4px; border-bottom: 1px solid var(--border); }
+  #detail td:last-child { text-align: right; color: var(--text); font-variant-numeric: tabular-nums; }
+  #detail .empty { color: var(--muted); font-style: italic; }
+  .acc-row { padding: 8px 0; border-bottom: 1px solid var(--border); cursor: pointer; }
+  .acc-row:hover { background: var(--panel-2); }
+  .acc-head { display: flex; align-items: center; gap: 8px; font-size: 13px; margin-bottom: 5px; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+  .acc-head .secs { margin-left: auto; color: var(--muted); font-size: 11px; }
+  .bar { display: grid; grid-template-columns: 112px 1fr 64px; align-items: center; gap: 8px; font-size: 11px; color: var(--text-2); margin: 2px 0; }
+  .track { height: 8px; background: var(--panel-2); border-radius: 4px; overflow: hidden; border: 1px solid var(--border); }
+  .fill { height: 100%; border-radius: 4px; }
+  .bar .val { text-align: right; color: var(--text); font-variant-numeric: tabular-nums; }
+  footer { margin-top: 14px; font-size: 11px; color: var(--muted); }
+  @media (max-width: 1100px) { #main { grid-template-columns: 1fr; } #tiles { grid-template-columns: repeat(3, 1fr); } }
+</style>
+</head>
+<body>
+<header>
+  <h1 id="h1"></h1>
+  <span class="meta" id="meta"></span>
+  <a class="btn" href="graph.html">Open race graph</a>
+  <a class="btn" href="race_report.md">Race report</a>
+</header>
+<div id="tiles"></div>
+<div id="main">
+  <div class="card">
+    <h2><span class="grow">Who raced whom</span></h2>
+    <div class="controls">
+      <button class="btn on" data-mode="battles">Battles</button>
+      <button class="btn" data-mode="passes">Passes</button>
+      <button class="btn" data-mode="alerts">Alerts</button>
+      <label><input type="checkbox" id="mine"> only battles with my car</label>
+    </div>
+    <svg id="chord"></svg>
+    <div id="hint"></div>
+    <div id="detail"><span class="empty">Click a car on the ring (or a rival on the right) for its numbers.</span></div>
+  </div>
+  <div class="card">
+    <h2><span class="grow">Rival read accuracy</span></h2>
+    <div class="controls" style="margin-bottom:8px">Rivals you battled, most battle time first. Estimate accuracy = 1 &minus; radar MAE / <span id="scale"></span> MJ; alerts right = ATTACK / DEFEND alerts confirmed by the truth.</div>
+    <div id="accuracy"></div>
+  </div>
+</div>
+<footer id="foot"></footer>
+<script>
+const D = /*__DATA__*/null;
+const R = D.race, T = D.totals, CARS = D.cars, OUR = CARS.findIndex(c => c.our);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const sign = (v, d) => (v > 0 ? '+' : '') + v.toFixed(d);
+document.getElementById('h1').textContent = 'Race dashboard - ' + R.our_code;
+document.getElementById('meta').textContent = R.track_id + ' · seed ' + R.seed + ' · ' + R.laps + ' laps · ' + R.source + ' race' + (R.test_mode ? ' · test mode' : '');
+document.getElementById('scale').textContent = D.accuracy_scale_mj;
+document.getElementById('foot').textContent = 'Built after the chequered flag (the rivals\' true batteries are shown). ' + R.run_id;
+
+const tiles = [
+  ['Finish', T.finish_position ? 'P' + T.finish_position : '-', CARS.length + ' cars'],
+  ['Alerts', T.alerts, T.alerts_judged ? T.alerts_right + '/' + T.alerts_judged + ' right (truth)' : 'none judged'],
+  ['Calls made', T.calls_made, T.calls_costed + ' costed'],
+  ['Passes made / lost', T.passes_made + ' / ' + T.passes_lost, 'Our Car'],
+  ['Total call cost', T.total_call_cost_s === null ? '-' : sign(T.total_call_cost_s, 1) + ' s', 'vs best option, paired forks', T.total_call_cost_s === null ? '' : T.total_call_cost_s > 0.05 ? 'bad' : 'good'],
+  ['Radar MAE', T.radar_mae_mj === null ? '-' : T.radar_mae_mj.toFixed(2) + ' MJ', 'all rivals, estimate vs truth'],
+];
+document.getElementById('tiles').innerHTML = tiles.map(([k, v, s, cls]) =>
+  '<div class="tile"><div class="k">' + esc(k) + '</div><div class="v ' + (cls || '') + '">' + esc(v) + '</div><div class="s">' + esc(s) + '</div></div>').join('');
+
+const STAT_NAMES = [
+  ['time_within_1s_s', 'Time within 1 s of you', v => v + ' s'], ['battles', 'Battles with you', v => v],
+  ['passes_made', 'Passes you made on them', v => v], ['passes_lost', 'Passes they made on you', v => v],
+  ['alerts', 'Alerts about them', v => Object.keys(v).length ? Object.entries(v).map(([k, n]) => n + ' ' + k.replace('_', ' ')).join(', ') : '0'],
+  ['alerts_right_pct', 'Alerts right (truth)', (v, s) => v === null ? '-' : v + ' % (' + s.alerts_right + '/' + s.alerts_judged + ')'],
+  ['radar_mae_mj', 'Radar MAE on them', v => v === null ? '-' : v.toFixed(2) + ' MJ'],
+  ['est_minus_true_mj', 'Mean estimate - true', v => v === null ? '-' : sign(v, 2) + ' MJ'],
+  ['calls', 'Calls about them', v => v], ['call_cost_s', 'Total call cost', v => v === null ? '-' : sign(v, 1) + ' s'],
+  ['max_closing_kmh', 'Max closing speed', v => v === null ? '-' : v.toFixed(0) + ' km/h'],
+  ['lap_delta_s', 'Avg lap time vs you', v => v === null ? '-' : sign(v, 2) + ' s'],
+];
+function showCar(k) {
+  const c = CARS[k], box = document.getElementById('detail');
+  let html = '<b style="color:' + esc(c.color) + '">&#9679;</b> <b>' + esc(c.code) + (c.our ? ' (YOU)' : '') + '</b> &middot; ' + esc(c.team) +
+    ' &middot; ' + (c.finish ? 'P' + c.finish : esc(c.status));
+  if (c.our) {
+    html += '<table>' + tiles.map(([k2, v]) => '<tr><td>' + esc(k2) + '</td><td>' + esc(v) + '</td></tr>').join('') + '</table>';
+  } else {
+    const s = D.stats[c.id];
+    html += '<table>' + STAT_NAMES.map(([key, name, f]) => {
+      const v = s[key], cls = key === 'call_cost_s' && v !== null ? (v > 0.05 ? 'bad' : 'good') : '';
+      return '<tr><td>' + esc(name) + '</td><td class="' + cls + '">' + esc(f(v, s)) + '</td></tr>';
+    }).join('') + '</table>';
+  }
+  box.innerHTML = html;
+  focus = k;
+  highlight(k);
+}
+
+// ---- chord ----------------------------------------------------------------
+const svg = d3.select('#chord'), W = 720, H = 720, r0 = 232, r1 = 248;
+svg.attr('viewBox', [-W / 2, -H / 2, W, H]);
+const gRib = svg.append('g'), gArc = svg.append('g'), gLab = svg.append('g');
+let mode = 'battles', mine = false, focus = null;
+const HASH = new URLSearchParams(location.hash.slice(1));  // e.g. dashboard.html#mode=passes&mine=1
+if (['battles', 'passes', 'alerts'].includes(HASH.get('mode'))) mode = HASH.get('mode');
+if (HASH.get('mine') === '1') { mine = true; document.getElementById('mine').checked = true; }
+document.querySelectorAll('[data-mode]').forEach(x => x.classList.toggle('on', x.dataset.mode === mode));
+const UNITS = { battles: ' s within 1 s', passes: ' pass(es)', alerts: ' alert(s)' };
+function matrix() {
+  const m = D.matrices[mode].map(row => row.slice());
+  if (mine) m.forEach((row, i) => row.forEach((v, j) => { if (i !== OUR && j !== OUR) row[j] = 0; }));
+  let total = 0; m.forEach(row => row.forEach(v => { total += v; }));
+  const eps = (total || 1) * 0.02;  // a slice per car: every car keeps its place on the ring
+  m.forEach((row, i) => { row[i] += eps; });
+  return { m, eps };
+}
+function draw() {
+  const { m, eps } = matrix();
+  const directed = mode !== 'battles';
+  const chords = (directed ? d3.chordDirected() : d3.chord()).padAngle(0.025).sortSubgroups(d3.descending)(m);
+  const arc = d3.arc().innerRadius(r0).outerRadius(r1);
+  const ribbon = (directed ? d3.ribbonArrow().headRadius(10) : d3.ribbon()).radius(r0 - 2);
+  const real = chords.filter(c => c.source.index !== c.target.index && (c.source.value > 0 || c.target.value > 0));
+  gRib.selectAll('path').data(real, c => c.source.index + '-' + c.target.index).join('path')
+    .attr('class', 'ribbon').attr('d', ribbon)
+    .attr('fill', c => { const a = c.source.index, b = c.target.index; return CARS[a === OUR ? b : a].color; })
+    .attr('fill-opacity', c => (c.source.index === OUR || c.target.index === OUR) ? 0.85 : 0.5)
+    .attr('stroke', c => (c.source.index === OUR || c.target.index === OUR) ? '#ffffff' : 'none').attr('stroke-opacity', 0.35)
+    .selectAll('title').data(c => [c]).join('title')
+    .text(c => CARS[c.source.index].code + (directed ? ' -> ' : ' - ') + CARS[c.target.index].code + ': ' +
+      (+c.source.value.toFixed(1)) + UNITS[mode]);
+  gArc.selectAll('path').data(chords.groups, g => g.index).join('path')
+    .attr('d', arc).attr('fill', g => CARS[g.index].color)
+    .attr('stroke', g => g.index === OUR ? '#ffffff' : '#0f0f1a').attr('stroke-width', g => g.index === OUR ? 3 : 1)
+    .style('cursor', 'pointer').on('click', (e, g) => showCar(g.index))
+    .on('mouseenter', (e, g) => highlight(g.index)).on('mouseleave', () => highlight(focus))
+    .selectAll('title').data(g => [g]).join('title').text(g => CARS[g.index].code + ' (' + CARS[g.index].team + ')');
+  gLab.selectAll('text').data(chords.groups, g => g.index).join('text')
+    .attr('class', g => g.index === OUR ? 'you' : null)
+    .each(function (g) { g.angle = (g.startAngle + g.endAngle) / 2; })
+    .attr('dy', '0.35em')
+    .attr('transform', g => 'rotate(' + (g.angle * 180 / Math.PI - 90) + ') translate(' + (r1 + 8) + ')' + (g.angle > Math.PI ? ' rotate(180)' : ''))
+    .attr('text-anchor', g => g.angle > Math.PI ? 'end' : null)
+    .style('cursor', 'pointer').on('click', (e, g) => showCar(g.index))
+    .text(g => g.index === OUR ? 'YOU (' + CARS[g.index].code + ')' : CARS[g.index].code);
+  document.getElementById('hint').textContent = real.length ? (mode === 'battles' ? 'Ribbon width = seconds two cars ran within 1 s of each other' :
+    mode === 'passes' ? 'Arrow = who passed whom (width = passes)' : 'Arrows from YOU = alerts about each rival') :
+    'Nothing to show for ' + mode + (mine ? ' with your car' : '') + '.';
+  highlight(focus);
+}
+function highlight(k) {
+  gRib.selectAll('path').attr('opacity', c => k === null || k === undefined ? 1 : (c.source.index === k || c.target.index === k) ? 1 : 0.08);
+}
+document.querySelectorAll('[data-mode]').forEach(b => b.onclick = () => {
+  mode = b.dataset.mode; document.querySelectorAll('[data-mode]').forEach(x => x.classList.toggle('on', x === b)); draw(); });
+document.getElementById('mine').onchange = e => { mine = e.target.checked; draw(); };
+svg.on('dblclick', () => { focus = null; highlight(null); });
+document.getElementById('hint').title = 'Double-click the ring to show every car again';
+draw();
+
+// ---- rival read accuracy --------------------------------------------------
+const pct = v => v === null || v === undefined ? null : Math.round(v * 100) / 100;
+function bar(name, value, colour, text) {
+  const w = value === null ? 0 : Math.max(0, Math.min(100, value));
+  return '<div class="bar"><span>' + esc(name) + '</span><div class="track"><div class="fill" style="width:' + w + '%;background:' + colour + '"></div></div>' +
+    '<span class="val">' + esc(text) + '</span></div>';
+}
+const acc = D.accuracy;
+document.getElementById('accuracy').innerHTML = acc.length ? acc.map(a => {
+  const est = a.estimate_accuracy === null ? null : a.estimate_accuracy * 100;
+  const estColour = est === null ? '#555' : est >= 75 ? 'var(--good)' : est >= 60 ? 'var(--warn)' : 'var(--bad)';
+  const right = a.alerts_right_pct;
+  const rightColour = right === null ? '#555' : right >= 60 ? 'var(--good)' : right >= 40 ? 'var(--warn)' : 'var(--bad)';
+  return '<div class="acc-row" data-id="' + esc(a.id) + '"><div class="acc-head"><span class="dot" style="background:' + esc(a.color) + '"></span><b>' + esc(a.code) +
+    '</b><span class="secs">' + a.battle_s.toFixed(0) + ' s within 1 s</span></div>' +
+    bar('estimate accuracy', est, estColour, est === null ? 'no data' : est.toFixed(0) + ' %' + (a.radar_mae_mj !== null ? ' (' + a.radar_mae_mj.toFixed(2) + ')' : '')) +
+    bar('alerts right', right, rightColour, right === null ? 'none judged' : right.toFixed(0) + ' % (' + a.alerts_right + '/' + a.alerts_judged + ')') + '</div>';
+}).join('') : '<div class="controls">Our Car never ran within 1 s of another car.</div>';
+document.querySelectorAll('.acc-row').forEach(el => el.onclick = () => {
+  const k = CARS.findIndex(c => c.id === el.dataset.id); if (k >= 0) showCar(k); });
+showCar(OUR);
+highlight(null);  // open on the whole field; a click focuses one car
+</script>
+</body>
+</html>

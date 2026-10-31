@@ -14,11 +14,14 @@ import pandas as pd
 import pytest
 
 from pitwall_sim.engineer.records import CallCost
+from pitwall_sim.graph.dashboard import ACCURACY_SCALE_MJ, dashboard_data
 from pitwall_sim.graph.race import graph_session, simulate
 from pitwall_sim.graph.race_graph import (
     battle_groups,
     build_graph,
     led_to_confidence,
+    pair_battle_s,
+    race_totals,
     rival_stats,
     write_race_graph,
 )
@@ -148,6 +151,34 @@ def test_files_offline_and_round_trip(race: Any, tmp_path: Path) -> None:
     assert "Rivals fought most" in report and "Battle groups" in report
     labels = json.loads((paths.folder / "labels.json").read_text(encoding="utf-8"))
     assert labels == graph["graph"]["communities"]
+
+
+def test_dashboard_agrees_with_the_graph(race: Any, tmp_path: Path) -> None:
+    _, record, _ = race
+    data = dashboard_data(record)
+    ids = [c["id"] for c in data["cars"]]
+    assert ids[0] == OUR and data["cars"][0]["our"] and len(ids) == 22  # YOU at the top
+    assert data["totals"] == race_totals(record)
+    battles = data["matrices"]["battles"]
+    assert all(battles[i][j] == battles[j][i] for i in range(22) for j in range(22))
+    for (x, y), secs in pair_battle_s(record).items():
+        assert battles[ids.index(x)][ids.index(y)] == round(secs, 1)
+    assert sum(map(sum, data["matrices"]["passes"])) == len(record.passes)
+    assert sum(data["matrices"]["alerts"][0]) == len(record.alerts)
+    rows = data["accuracy"]
+    assert rows and [r["battle_s"] for r in rows] == sorted((r["battle_s"] for r in rows),
+                                                            reverse=True)  # fmt: skip
+    stats = rival_stats(record)
+    for r in rows:
+        mae = stats[r["id"]]["radar_mae_mj"]
+        if mae is not None:
+            assert r["estimate_accuracy"] == round(max(0.0, 1.0 - mae / ACCURACY_SCALE_MJ), 3)
+        assert r["alerts_right_pct"] == stats[r["id"]]["alerts_right_pct"]
+    paths = write_race_graph(record, tmp_path / record.run_id)
+    assert paths.dashboard is not None
+    html = paths.dashboard.read_text(encoding="utf-8")
+    assert 'src="lib/d3.min.js"' in html and "https://" not in html
+    assert (paths.folder / "lib" / "d3.min.js").stat().st_size > 100_000
 
 
 @pytest.mark.skipif(shutil.which("graphify") is None, reason="graphify CLI not installed")
