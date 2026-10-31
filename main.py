@@ -11,9 +11,10 @@ from __future__ import annotations
 import logging
 import sys
 
-from PySide6.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication, QMessageBox
 
 from pitwall_sim.live.session import LiveSession
+from pitwall_sim.track.openf1 import OpenF1Error
 from pitwall_sim.ui.pitwall_lite import PitWallWindow
 from pitwall_sim.ui.setup_screen import SetupScreen
 
@@ -25,7 +26,11 @@ def main() -> int:
     setup = SetupScreen()
     if setup.exec() != SetupScreen.DialogCode.Accepted:
         return 0
-    session = LiveSession(setup.choice())
+    try:
+        session = LiveSession(setup.choice())
+    except OpenF1Error as exc:  # E3 real race moment: no network and nothing cached
+        QMessageBox.critical(None, "Real race moment", f"OpenF1 data unavailable: {exc}")
+        return 1
     window = PitWallWindow(session)
     window.resize(1480, 900)
     window.show()

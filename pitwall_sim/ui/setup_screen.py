@@ -63,6 +63,13 @@ class SetupScreen(QDialog):
             "Test mode - show Rivals' TRUE battery (a real team can't see it)"
         )
         self.test_mode.setStyleSheet(f"color:{CLIP};")
+        # E3 Real race moment: start at a real lap of the 2026 Japanese GP (OpenF1).
+        self.real_race = QCheckBox("Real race moment - start at a real 2026 Japanese GP lap")
+        self.real_lap = QSpinBox()
+        self.real_lap.setRange(2, self.full_laps)
+        self.real_lap.setValue(load_app(config_dir).real_race.default_lap)
+        self.real_lap.setEnabled(False)
+        self.real_race.toggled.connect(self._real_race_toggled)
 
         form = QFormLayout()
         form.addRow("Track", self.track)
@@ -73,6 +80,8 @@ class SetupScreen(QDialog):
         form.addRow("Race laps", self.laps)
         form.addRow("Safety Car on lap (demo)", self.sc_lap)
         form.addRow("Scenario", self.preset)
+        form.addRow(self.real_race)
+        form.addRow("Real race lap", self.real_lap)
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
         )
@@ -85,6 +94,12 @@ class SetupScreen(QDialog):
         layout.addWidget(self.pause_on_alert)
         layout.addWidget(self.test_mode)
         layout.addWidget(buttons)
+
+    def _real_race_toggled(self, on: bool) -> None:
+        """Real race moment: the real race sets laps, order and tyres (no preset)."""
+        self.real_lap.setEnabled(on)
+        for widget in (self.laps, self.preset):
+            widget.setEnabled(not on)
 
     def _fill_drivers(self, team_name: str) -> None:
         self.driver.clear()
@@ -104,4 +119,5 @@ class SetupScreen(QDialog):
             preset=self.preset.currentData(),
             strategy=True,  # the pit wall shows the strategy panel (H5)
             scripted_sc_lap=int(self.sc_lap.value()) or None,
+            real_lap=int(self.real_lap.value()) if self.real_race.isChecked() else None,
         )

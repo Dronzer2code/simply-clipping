@@ -836,6 +836,35 @@ class DemoConfig(StrictModel):
     """Force a Safety Car when the leader starts this lap."""
 
 
+class RealRaceConfig(StrictModel):
+    """Real race moment (hackathon E3): start from a real 2026 race lap (OpenF1).
+
+    Real timing gives order, gaps, laps, tyres and stops; the hidden values below
+    are hand-set defaults (HR-09), not data.
+    """
+
+    session_key: int = 11253
+    """OpenF1 session: the 2026 Japanese GP race (Suzuka)."""
+    default_lap: int = Field(default=30, ge=2)
+    battery_fraction: Fraction = 1.0
+    """Every car's battery at the moment: the race-start prior (assumed full)."""
+    wear_per_lap: dict[Compound, Fraction] = Field(
+        default_factory=lambda: {
+            Compound.SOFT: 0.018,
+            Compound.MEDIUM: 0.018,
+            Compound.HARD: 0.026,
+            Compound.INTERMEDIATE: 0.018,
+            Compound.WET: 0.018,
+        }
+    )
+    """Tyre wear = tyre age x this (the sim's own wear per lap on Suzuka)."""
+    fuel_per_lap_kg: Positive = 1.75
+    fuel_margin_kg: float = Field(default=2.0, ge=0.0)
+    """Start fuel = laps to go x ``fuel_per_lap_kg`` + this."""
+    min_spacing_m: Positive = 8.0
+    """Cars closer than this on the road at the moment are moved back to it."""
+
+
 class AppConfig(StrictModel):
     """``config/app.yaml``."""
 
@@ -871,3 +900,4 @@ class AppConfig(StrictModel):
     radio_llm: RadioLlmConfig = RadioLlmConfig()
     voice_input: VoiceInputConfig = VoiceInputConfig()
     calibration: CalibrationConfig
+    real_race: RealRaceConfig = RealRaceConfig()

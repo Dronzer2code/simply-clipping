@@ -262,3 +262,45 @@ def _check_mirror_covers_car_state() -> None:
 
 
 _check_mirror_covers_car_state()
+
+
+# --------------------------------------------------------------------------- #
+# A race picked up mid-way (hackathon E3, light PF-18)
+# --------------------------------------------------------------------------- #
+
+
+@dataclass(frozen=True)
+class StartCar:
+    """One car at the moment a race is picked up (``RaceSetup.start``)."""
+
+    driver_id: str
+    laps_done: int
+    """Completed laps at the moment (the leader: the lap about to start - 1)."""
+    lap_fraction: float
+    """Share of the current lap already driven, 0 .. 1 (track position = share x length)."""
+    lap_elapsed_s: float
+    """Time since the car's last line crossing (its current lap's timing starts there)."""
+    gap_s: float
+    """Gap to the leader (public timing until the first loop updates it)."""
+    interval_s: float
+    compound: Compound
+    tyre_age_laps: int
+    tyre_wear: float
+    """Hidden: real data has no wear; the caller sets a documented default."""
+    pit_stops: int
+    retired: bool = False
+
+
+@dataclass(frozen=True)
+class StartState:
+    """Every car's place, tyres and stops at ``t = 0`` of a race started mid-way.
+
+    ``cars`` lists the cars in running order (retired cars last). Hidden values real
+    timing cannot give (battery, tyre wear, fuel) come from the caller's defaults.
+    """
+
+    cars: tuple[StartCar, ...]
+    battery_fraction: float
+    """Every car's battery as a share of its usable maximum."""
+    min_spacing_m: float
+    """Cars closer than this on the road are pushed back to it (no overlapping cars)."""
