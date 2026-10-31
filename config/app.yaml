@@ -190,6 +190,7 @@ rival_strategy:
   low_battery_mj: 1.0 # battery at the line below this: HARVEST
   recover_battery_mj: 2.5 # until the battery at the line is back to this
   push_final_laps: 3 # PUSH in the last laps (battery above low_battery_mj)
+  wet_delay_max_laps: 2 # HAND-SET (hackathon E1): past the wet crossover each Rival boxes 0..2 laps later (RNG stream rival_strategy), so some stay out "one more lap"
 
 ai_driver:
   # F04 AI Driver (T-031, TRD AI DRIVER). Owner values are sourced; the rest are
@@ -227,6 +228,8 @@ weather:
   forecast_horizon_s: 600.0 # TRD: noisy forecast of the next 10 min
   forecast_noise_sd: 0.1 # PLACEHOLDER: calibrate
   replan_grip_step: 0.02 # STRUCTURAL: rebuild a car's plan when its grip moves by 2 %
+  forced_rain_condition: WET # HAND-SET (hackathon E1): forced rain (setup "Rain from lap") starts as WET
+  forced_rain_hold_s: 600.0 # HAND-SET (hackathon E1): ... and stays WET this long before the track's chain moves on
 
 mistakes:
   # F04 AI Driver mistakes (T-037, TRD AI DRIVER: per-corner probability from
@@ -261,6 +264,12 @@ race_events:
   crash_on_line_p: 0.5 # HAND-SET: share of crashes stopped on the racing line (SC); the rest off it (VSC)
   rival_box_window_laps: 5 # HAND-SET: under SC / VSC a Rival boxes if its planned stop is at most this many laps away
   rival_box_min_laps_left: 3 # HAND-SET: ... and at least this many laps remain
+  # T-038 overtake contact (MVP-11): an attempt with a pass chance of at least
+  # contact_min_p_pass touches with probability contact_p (RNG stream events).
+  contact_min_p_pass: 0.05 # HAND-SET: about 20 such attempts in a 15-lap race
+  contact_p: 0.03 # HAND-SET: about 0.6 contacts per 15-lap race
+  contact_shares: {LIGHT: 0.7, VSC: 0.2, SC: 0.1} # HAND-SET: LIGHT both cars slowed; VSC / SC the attacker stops off / on the line
+  contact_speed_factor: 0.7 # HAND-SET: LIGHT contact, speed both cars keep
 
 strategy_panel:
   # Hackathon H5: pit plans forked in background processes (live/strategy.py).
@@ -268,6 +277,7 @@ strategy_panel:
 
 demo:
   scripted_sc_lap: null # demo: force a Safety Car when the leader starts this lap (null = off)
+  rain_lap: null # demo (hackathon E1): force rain when the leader starts this lap (null = off)
 
 race_engine:
   # F05 race engine (T-033). STRUCTURAL defaults unless noted.

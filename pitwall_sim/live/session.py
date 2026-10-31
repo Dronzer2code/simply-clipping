@@ -73,6 +73,8 @@ class LiveSetup:
     """Force a Safety Car on this lap (demo); ``None`` = ``demo.scripted_sc_lap``."""
     strategy: bool = False
     """Run the strategy panel's background forks (H5); the pit wall turns it on."""
+    rain_lap: int | None = None
+    """Force rain from this lap (E1); ``None`` = ``demo.rain_lap`` (the track's odds if unset)."""
 
 
 @dataclass(frozen=True)
@@ -183,6 +185,7 @@ class LiveSession:
             RaceSetup(track_id=s.track_id, rule_set_id=s.rule_set_id, seed=s.seed, laps=s.laps,
                       fuel_kg=s.fuel_kg, our_driver_id=s.our_driver_id,
                       scripted_sc_lap=s.scripted_sc_lap,
+                      rain_lap=s.rain_lap,
                       grid_order=presets.grid_order(s.preset, s.our_driver_id, default)),
             self.config_dir,
         )  # fmt: skip
@@ -342,6 +345,8 @@ class LiveSession:
             view = self._view
             car = view.our_car
             compound = "MEDIUM" if str(car.compound) in ("HARD", "Compound.HARD") else "HARD"
+            if view.weather_public.condition != "DRY":  # E1: a plain "box" in the rain = inters
+                compound = "INTERMEDIATE"
             result = parse(text, self._corners, car.lap + 1, compound, str(car.energy_mode))
             snapshot_id = self._snapshot_now()
             first = len(self._issued)

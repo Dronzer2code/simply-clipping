@@ -17,6 +17,12 @@ car's Ground Truth; the opponents' energy comes only from their Radar Estimates
   the planned lap is reached or the car behind threatens an undercut; at
   ``critical_wear`` box at any time; never in the last laps. SC / VSC (T-038)
   and weather (T-039) reactions come with those tasks (T-062).
+- wet crossover (T-062 weather branch, hackathon E1): from the public track
+  wetness, the grippiest of the car's slick, INTERMEDIATE and WET (the tyres.yaml
+  grip curves, :func:`~pitwall_sim.race.weather.best_compound`). Once that is a
+  different tyre class from the one fitted, the car boxes for it after its own
+  ``wet_delay_laps`` (0..``wet_delay_max_laps``, drawn once on RNG stream
+  ``rival_strategy``): some box at the crossover, some do "one more lap".
 
 Plans are made at the start: one stop at ``stop_fraction[strategy_style]`` of
 the race (teammates ``teammate_offset_laps`` apart, jitter on RNG stream
@@ -25,7 +31,7 @@ the race (teammates ``teammate_offset_laps`` apart, jitter on RNG stream
 
 from __future__ import annotations
 
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 
 import numpy as np
 import numpy.typing as npt
@@ -33,6 +39,7 @@ from numba import njit
 
 from pitwall_sim.config.models import Compound, EnergyMode, RivalStrategyConfig
 from pitwall_sim.driver.ai_driver import MODE_CODES, DriverInstructions
+from pitwall_sim.race.weather import WET_COMPOUNDS
 
 MJ = 1e6
 
@@ -201,6 +208,20 @@ class RivalBook:
     next_compound: tuple[Compound, ...]
     stops_done: npt.NDArray[np.int64]
     harvesting: npt.NDArray[np.bool_]
+    wet_delay_laps: npt.NDArray[np.int64] = field(
+        default_factory=lambda: np.zeros(0, dtype=np.int64)
+    )
+    """Laps each car stays out past a wet crossover (E1); see :func:`draw_wet_delays`."""
+    wet_due_lap: npt.NDArray[np.int64] = field(default_factory=lambda: np.zeros(0, dtype=np.int64))
+    """Completed laps at which the car boxes for the wet crossover it has seen (-1: none)."""
+
+    def __post_init__(self) -> None:
+        """Size the wet-crossover arrays to the rows (no delay, nothing seen yet)."""
+        n = self.index.size
+        if self.wet_delay_laps.size != n:
+            self.wet_delay_laps = np.zeros(n, dtype=np.int64)
+        if self.wet_due_lap.size != n:
+            self.wet_due_lap = np.full(n, -1, dtype=np.int64)
 
     @classmethod
     def from_plans(cls, plans: dict[str, RivalPlan], driver_ids: tuple[str, ...]) -> RivalBook:
@@ -223,6 +244,33 @@ class RivalBook:
             driver_id, int(self.stop_lap[k]), self.next_compound[k], float(self.aggression[k]),
             int(self.stops_done[k]), bool(self.harvesting[k]),
         )  # fmt: skip
+
+
+def draw_wet_delays(book: RivalBook, cfg: RivalStrategyConfig, rng: np.random.Generator) -> None:
+    """Each Rival's laps past a wet crossover before it boxes (uniform 0..max, HR-04)."""
+    book.wet_delay_laps[:] = rng.integers(0, cfg.wet_delay_max_laps + 1, size=book.index.size)
+
+
+def crosses_over(current: Compound, target: Compound) -> bool:
+    """Return whether ``current`` -> ``target`` is a wet-crossover stop (slick / inter / wet)."""
+    return current != target and (current in WET_COMPOUNDS or target in WET_COMPOUNDS)
+
+
+def wet_box_due(
+    book: RivalBook, k: int, current: Compound, target: Compound, laps_done: int, race_laps: int
+) -> bool:
+    """Return whether row ``k`` boxes now for ``target`` (wet crossover branch).
+
+    The first tick that ``target`` (the grippiest tyre for the public track wetness)
+    is a different class from ``current`` sets the due lap ``wet_delay_laps`` on;
+    back on the right side of the crossover the call is dropped. Never on the last lap.
+    """
+    if not crosses_over(current, target):
+        book.wet_due_lap[k] = -1
+        return False
+    if book.wet_due_lap[k] < 0:
+        book.wet_due_lap[k] = laps_done + int(book.wet_delay_laps[k])
+    return bool(laps_done >= book.wet_due_lap[k]) and race_laps - laps_done > 1
 
 
 def decide_book(

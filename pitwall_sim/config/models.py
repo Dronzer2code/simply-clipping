@@ -566,6 +566,8 @@ class RivalStrategyConfig(StrictModel):
     low_battery_mj: float = Field(ge=0.0)
     recover_battery_mj: float = Field(ge=0.0)
     push_final_laps: int = Field(ge=0)
+    wet_delay_max_laps: int = Field(default=2, ge=0)
+    """Wet crossover (hackathon E1): each Rival boxes 0..this many laps after it."""
 
 
 class AiDriverConfig(StrictModel):
@@ -676,6 +678,10 @@ class WeatherConfig(StrictModel):
     forecast_noise_sd: float = Field(ge=0.0)
     replan_grip_step: Positive
     """Car plans are rebuilt when a car's grip moves by this much."""
+    forced_rain_condition: Literal["DAMP", "WET", "HEAVY_WET"] = "WET"
+    """Forced rain (hackathon E1): the condition the rain starts in."""
+    forced_rain_hold_s: float = Field(default=600.0, ge=0.0)
+    """Forced rain holds its condition this long before the Markov chain moves on."""
 
 
 MistakeKind = Literal["LOCK_UP", "OFF_TRACK", "SPIN", "CRASH"]
@@ -769,6 +775,13 @@ class CalibrationConfig(StrictModel):
     """Reference speed traces must have samples in this many sections (owner round 13)."""
 
 
+ContactSeverity = Literal["LIGHT", "VSC", "SC"]
+
+
+def _contact_shares() -> dict[ContactSeverity, float]:
+    return {"LIGHT": 0.7, "VSC": 0.2, "SC": 0.1}
+
+
 class RaceEventsConfig(StrictModel):
     """Safety Car and VSC (hackathon H4, simplified T-038)."""
 
@@ -782,6 +795,20 @@ class RaceEventsConfig(StrictModel):
     crash_on_line_p: Fraction = 0.5
     rival_box_window_laps: int = Field(default=5, ge=0)
     rival_box_min_laps_left: int = Field(default=3, ge=0)
+    contact_min_p_pass: Fraction = 0.05
+    """Overtake contact (T-038): only attempts with at least this pass chance can touch."""
+    contact_p: Fraction = 0.03
+    """Chance of contact in such an attempt."""
+    contact_shares: dict[ContactSeverity, Fraction] = Field(default_factory=_contact_shares)
+    """Contact severity: both cars slowed; attacker out off the line (VSC) / on it (SC)."""
+    contact_speed_factor: Fraction = 0.7
+    """LIGHT contact: speed both cars keep."""
+
+    @model_validator(mode="after")
+    def _contact_shares_sum_to_one(self) -> RaceEventsConfig:
+        if abs(sum(self.contact_shares.values()) - 1.0) > 1e-9:
+            raise ValueError("race_events.contact_shares must sum to 1")
+        return self
 
 
 class StrategyPanelConfig(StrictModel):
@@ -796,6 +823,8 @@ class DemoConfig(StrictModel):
 
     scripted_sc_lap: int | None = None
     """Force a Safety Car when the leader starts this lap."""
+    rain_lap: int | None = None
+    """Force rain when the leader starts this lap (hackathon E1)."""
 
 
 class AppConfig(StrictModel):

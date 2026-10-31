@@ -5,7 +5,9 @@ Triggers, checked every tick, at most one message per ``MIN_GAP_S`` of race time
 - battery below ``LOW_BATTERY_MJ`` with a long straight (an acceleration zone of at
   least ``LONG_STRAIGHT_M``) starting within ``STRAIGHT_AHEAD_M``: once per straight;
 - tyre wear above ``TYRE_WEAR``: once per set of tyres;
-- a place gained or lost (public timing).
+- a place gained or lost (public timing);
+- rain starting (``Rain at Turn 7, it's getting slippery.``, at the next corner
+  ahead) or stopping (public weather condition, E1): said at once, not rate limited.
 
 Safety Car / VSC calls come from the session (they are not rate limited). Texts are
 templates with the facts filled in (no LLM).
@@ -39,6 +41,8 @@ class DriverRadio:
     """(lap, zone) of the last low-battery warning."""
     _tyres_warned: bool = False
     _straights: list[tuple[str, float]] = field(default_factory=list)
+    _condition: str = "DRY"
+    """Public weather condition at the last update (E1)."""
 
     def __post_init__(self) -> None:
         """Long straights: (zone_id, start s) of acceleration zones of ``LONG_STRAIGHT_M``+."""
@@ -51,6 +55,9 @@ class DriverRadio:
     def update(self, view: EngineerView) -> str | None:
         """Return the message to say now, if any (rate limited)."""
         car, timing = view.our_car, view.timing
+        if (rain := self._rain(view)) is not None:
+            self._last_t = view.t_s
+            return rain
         place = timing.order.index(self.our) + 1 if self.our in timing.order else None
         message = None
         if car.tyre_wear < TYRE_WEAR:
@@ -70,6 +77,23 @@ class DriverRadio:
             return None
         self._last_t = view.t_s
         return message
+
+    def _rain(self, view: EngineerView) -> str | None:
+        """Return the rain line when the public condition goes from DRY to rain or back (E1)."""
+        condition = view.weather_public.condition
+        old, self._condition = self._condition, condition
+        if old == "DRY" and condition != "DRY":
+            return f"Rain at {self._corner_ahead(view.our_car.s_m)}, it's getting slippery."
+        if old != "DRY" and condition == "DRY":
+            return "Rain's stopped."
+        return None
+
+    def _corner_ahead(self, s_m: float) -> str:
+        length = float(self.track.official_length_m or 1.0)
+        corners = self.track.corners
+        if not corners:
+            return "the track"
+        return min(corners, key=lambda c: (c.s_m - s_m) % length).name
 
     def _straight_ahead(self, s_m: float) -> str | None:
         length = float(self.track.official_length_m or 1.0)

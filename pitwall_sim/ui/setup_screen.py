@@ -52,6 +52,10 @@ class SetupScreen(QDialog):
         self.sc_lap.setRange(0, self.full_laps)
         self.sc_lap.setSpecialValueText("off")
         self.sc_lap.setValue(load_app(config_dir).demo.scripted_sc_lap or 0)
+        self.rain_lap = QSpinBox()  # E1: force rain from this lap (0 = off: the track's odds)
+        self.rain_lap.setRange(0, self.full_laps)
+        self.rain_lap.setSpecialValueText("off")
+        self.rain_lap.setValue(load_app(config_dir).demo.rain_lap or 0)
         self.seed = QSpinBox()
         self.seed.setRange(0, 999999)
         self.seed.setValue(42)
@@ -72,6 +76,7 @@ class SetupScreen(QDialog):
         form.addRow("Seed", self.seed)
         form.addRow("Race laps", self.laps)
         form.addRow("Safety Car on lap (demo)", self.sc_lap)
+        form.addRow("Rain from lap", self.rain_lap)
         form.addRow("Scenario", self.preset)
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
@@ -104,4 +109,5 @@ class SetupScreen(QDialog):
             preset=self.preset.currentData(),
             strategy=True,  # the pit wall shows the strategy panel (H5)
             scripted_sc_lap=int(self.sc_lap.value()) or None,
+            rain_lap=int(self.rain_lap.value()) or None,
         )
