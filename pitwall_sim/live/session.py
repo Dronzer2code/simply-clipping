@@ -81,6 +81,8 @@ class LiveSetup:
     real_lap: int | None = None
     """Real race moment (E3): start at this lap of the real 2026 Japanese GP (OpenF1);
     order, gaps, tyres and stops from the real race. ``None`` = a normal race."""
+    rain_lap: int | None = None
+    """Force rain from this lap (E1); ``None`` = ``demo.rain_lap`` (the track's odds if unset)."""
 
 
 @dataclass(frozen=True)
@@ -194,6 +196,7 @@ class LiveSession:
         race_setup = RaceSetup(
             track_id=s.track_id, rule_set_id=s.rule_set_id, seed=s.seed, laps=s.laps,
             fuel_kg=s.fuel_kg, our_driver_id=s.our_driver_id, scripted_sc_lap=s.scripted_sc_lap,
+            rain_lap=s.rain_lap,
             grid_order=presets.grid_order(s.preset, s.our_driver_id, default),
         )  # fmt: skip
         if s.real_lap is not None:  # E3 real race moment (presets do not apply)
@@ -367,6 +370,8 @@ class LiveSession:
             view = self._view
             car = view.our_car
             compound = "MEDIUM" if str(car.compound) in ("HARD", "Compound.HARD") else "HARD"
+            if view.weather_public.condition != "DRY":  # E1: a plain "box" in the rain = inters
+                compound = "INTERMEDIATE"
             path = "LLM" if result is not None else "KEYWORD"
             if result is None:
                 result = parse(text, self._corners, car.lap + 1, compound, str(car.energy_mode))

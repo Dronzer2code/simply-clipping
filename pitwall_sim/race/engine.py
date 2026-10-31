@@ -58,13 +58,14 @@ from pitwall_sim.config.loader import (
     load_race_config,
     resolve_harvest_limit_mj,
 )
-from pitwall_sim.config.models import Compound, EnergyMode, MistakeKind
+from pitwall_sim.config.models import Compound, ContactSeverity, EnergyMode, MistakeKind
 from pitwall_sim.driver import ai_driver as D
 from pitwall_sim.engineer.commands import CommandContext, CommandType, EngineerCommand
 from pitwall_sim.observe.public_feed import PublicFeed
 from pitwall_sim.observe.radar.energy import RadarBank, RadarEstimate
 from pitwall_sim.race import rival_strategy as RS
 from pitwall_sim.race import step_kernel as K
+from pitwall_sim.race import weather as W
 from pitwall_sim.race.overtake import OvertakeEvent, OvertakeModel, trigger_points
 from pitwall_sim.race.pit import PitEvent, PitLane, PitPhase
 from pitwall_sim.race.snapshot import Snapshot, make_rngs, rng_states
@@ -136,6 +137,16 @@ class MistakeEvent:
 
 
 @dataclass(frozen=True)
+class ContactEvent:
+    """Contact in an overtake attempt (T-038): LIGHT, or the attacker out (VSC / SC)."""
+
+    t_s: float
+    attacker: int
+    defender: int
+    severity: ContactSeverity
+
+
+@dataclass(frozen=True)
 class RaceSetup:
     """What the user picks on Race Setup (S1) for one race."""
 
@@ -162,6 +173,10 @@ class RaceSetup:
     start: StartState | None = None
     """Pick the race up mid-way (E3 real race moment); ``None`` = standing start.
     ``grid_order`` must then list the cars in ``start.cars`` order."""
+    rain_lap: int | None = None
+    """Force rain when the leader starts this lap (E1); ``None`` = ``demo.rain_lap``.
+
+    The race is dry until then (``rain`` is ignored unless it is ``dry``, which wins)."""
 
 
 @dataclass
@@ -331,9 +346,14 @@ class RaceEngine:
         self.rngs = make_rngs(setup.seed)
         # Weather (T-039) before the first plans: they use the grip it gives.
         self.weather = WeatherState()
+        rain_lap = setup.rain_lap if setup.rain_lap is not None else self.app.demo.rain_lap
+        self._rain_lap = rain_lap if setup.rain != "dry" else None
+        """Forced rain (E1): the leader's lap it starts on, until it has started."""
         self.weather_model = WeatherModel.for_race(
-            self.app.weather, self.track, self.rngs["weather"], setup.rain, self.weather
-        )
+            self.app.weather, self.track, self.rngs["weather"],
+            "dry" if self._rain_lap is not None else setup.rain, self.weather,
+        )  # fmt: skip
+        self.weather_model.rain_pending = self._rain_lap is not None
         self.instructions = [D.DriverInstructions() for _ in range(n)]
         self._instruction_arrays = D.instruction_arrays(self.instructions, self.app.ai_driver)
         self.balances = [D.EnergyBalance(self.app.ai_driver.energy_feedback_gain) for _ in range(n)]
@@ -393,6 +413,10 @@ class RaceEngine:
                     Compound.HARD if car.compound != Compound.HARD else Compound.MEDIUM
                 )
         self.rival_book = RS.RivalBook.from_plans(self.rival_plans, self.driver_ids)
+        # Drawn after every plan, so the plans' own draws are as before (E1).
+        RS.draw_wet_delays(self.rival_book, self.app.rival_strategy, self.rngs["rival_strategy"])
+        self.rivals_wet_boxed: list[tuple[int, str, Compound]] = []
+        """(Rival's completed laps, driver_id, compound) of every wet-crossover call (E1)."""
         if setup.our_driver_id is not None and setup.our_driver_id not in self.driver_ids:
             raise ConfigError(f"our_driver_id {setup.our_driver_id} is not on the grid")
         self.feed = PublicFeed(
@@ -426,6 +450,8 @@ class RaceEngine:
             else np.full(n, np.inf)
         )
         self.mistakes: list[MistakeEvent] = []
+        self.contacts: list[ContactEvent] = []
+        """Overtake contacts (T-038)."""
 
         # Clock and timing.
         dt = self.app.sim.dt_s
@@ -832,9 +858,53 @@ class RaceEngine:
                     attack=bool(attack[k]), defend=bool(defend[k]), hold_position=bool(hold[k]),
                 ),
             )  # fmt: skip
+        targets = self._rival_targets()
         for k in np.flatnonzero(racing & box):
-            if self.box(int(idx[k]), book.next_compound[k]):
+            if self.box(int(idx[k]), self._rival_compound(int(k), targets)):
                 book.stops_done[k] += 1
+        if targets is not None:
+            self._rivals_wet(racing, targets)
+
+    def _rival_targets(self) -> list[Compound] | None:
+        """Per Rival row, the grippiest tyre for the track now (E1); ``None`` on a dry track.
+
+        Public information only (HR-03): the track wetness everyone sees and the
+        tyres.yaml grip curves, plus the car's own tyres.
+        """
+        idx = self.rival_book.index
+        wet = set(W.WET_COMPOUNDS)
+        if self.weather.track_wetness <= 0.0 and not any(self.compounds[i] in wet for i in idx):
+            return None
+        best: dict[Compound, Compound] = {}
+        out = []
+        for k, i in enumerate(idx.tolist()):
+            current = self.compounds[i]
+            slick = current if current not in wet else self.rival_book.next_compound[k]
+            if slick not in best:
+                best[slick] = W.best_compound(self.tyres, self.weather.track_wetness, slick)
+            out.append(best[slick])
+        return out
+
+    def _rival_compound(self, k: int, targets: list[Compound] | None) -> Compound:
+        """Return the tyre Rival row ``k`` fits at a stop: wet ones while the track wants them."""
+        if targets is not None and targets[k] in W.WET_COMPOUNDS:
+            return targets[k]
+        return self.rival_book.next_compound[k]
+
+    def _rivals_wet(self, racing: npt.NDArray[np.bool_], targets: list[Compound]) -> None:
+        """Wet crossover branch (T-062 weather, E1): box for the right tyre after each delay."""
+        st, book = self.st, self.rival_book
+        for k, i in enumerate(book.index.tolist()):
+            if not racing[k] or st.in_pit[i] or self.pit.phase[i] != PitPhase.RUNNING:
+                continue
+            done = max(int(st.lap[i]), 0)
+            if RS.wet_box_due(book, k, self.compounds[i], targets[k], done, self.laps):
+                if self.box(i, targets[k]):
+                    book.stops_done[k] += 1
+                    book.wet_due_lap[k] = -1
+                    self.rivals_wet_boxed.append((done, self.driver_ids[i], targets[k]))
+                    logger.info("%s boxes for %s (wet crossover), lap %d",
+                                self.driver_ids[i], targets[k], done + 1)  # fmt: skip
 
     def _rival_decisions(self) -> RS.Decisions:
         """``(mode, attack, defend, hold, box)`` per row of ``rival_book`` (PF-10).
@@ -895,6 +965,10 @@ class RaceEngine:
         st = self.st
         leader_lap = int(st.lap.max())
         laps, self._weather_lap = max(leader_lap - self._weather_lap, 0), leader_lap
+        if self._rain_lap is not None and st.running.any() and self.flag != "CHEQUERED":
+            if int(st.lap[st.running].max()) + 1 >= self._rain_lap:  # the leader starts it
+                self._rain_lap = None
+                self.weather_model.start_rain()
         share = float(np.count_nonzero(st.running & ~st.in_pit)) / self.n
         if self.weather_model.step(self.decision_steps * self.dt, share, laps):
             logger.info("weather: %s at %.0f s", self.weather.condition, self.t)
@@ -966,7 +1040,37 @@ class RaceEngine:
                 a = event.attacker
                 if a == self.our_index and self.instructions[a].attack:  # ATTACK done
                     self._end_attack(a)
+        for event in events:
+            self._contact(event)
         return events
+
+    def _contact(self, event: OvertakeEvent) -> None:
+        """Overtake contact (T-038, MVP-11; RNG ``events`` only, HR-04).
+
+        A real attempt (pass chance at least ``contact_min_p_pass``; not a blue
+        flag) touches with probability ``contact_p``. Severity by ``contact_shares``:
+        LIGHT slows both cars to ``contact_speed_factor``; VSC / SC stops the
+        attacker off / on the racing line, an incident that raises a VSC / SC.
+        """
+        cfg = self.app.race_events
+        if event.blue_flag or event.p_pass < cfg.contact_min_p_pass or cfg.contact_p <= 0.0:
+            return
+        rng = self.rngs["events"]
+        if rng.random() >= cfg.contact_p:
+            return
+        shares, u = cfg.contact_shares, rng.random()
+        cumulative = np.cumsum(list(shares.values()))
+        picked = (s for s, c in zip(shares, cumulative, strict=True) if u < c)
+        severity: ContactSeverity = next(picked, "LIGHT")
+        a, d = event.attacker, event.defender
+        self.contacts.append(ContactEvent(self.t, a, d, severity))
+        logger.info("contact %s / %s at %.0f m: %s", self.driver_ids[a], self.driver_ids[d],
+                    event.s_m, severity)  # fmt: skip
+        if severity == "LIGHT":
+            self.st.v_ms[[a, d]] *= cfg.contact_speed_factor
+            return
+        self.retire(a, f"contact with {self.driver_ids[d]}")
+        self.incident(a, on_line=severity == "SC")
 
     def _pit(self) -> list[PitEvent]:
         """Pit lane state machine (PF-12); fits the new tyres at the pit exit."""
@@ -1094,6 +1198,7 @@ class RaceEngine:
     def _rivals_sc_pit(self) -> None:
         """Rivals' SC / VSC pit branch: box now if the planned stop is near, else stay out."""
         cfg, st, book = self.app.race_events, self.st, self.rival_book
+        targets = self._rival_targets()
         for k, i in enumerate(book.index.tolist()):
             if not st.running[i] or st.in_pit[i] or book.stops_done[k] > 0:
                 continue
@@ -1102,7 +1207,7 @@ class RaceEngine:
                 continue
             if int(book.stop_lap[k]) - done > cfg.rival_box_window_laps:
                 continue  # its planned stop is far off: stays out
-            if self.box(i, book.next_compound[k]):
+            if self.box(i, self._rival_compound(k, targets)):
                 book.stops_done[k] += 1
                 self.sc_rivals_boxed.append(self.driver_ids[i])
 

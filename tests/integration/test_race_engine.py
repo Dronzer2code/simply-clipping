@@ -26,6 +26,9 @@ FULL_RACE_FUEL_KG = 110.0
 @pytest.fixture(scope="module")
 def full_race() -> tuple[RaceEngine, RaceResult]:
     engine = RaceEngine(RaceSetup(fuel_kg=FULL_RACE_FUEL_KG), CONFIG_DIR)
+    # Every car to the flag: no overtake contacts (T-038, tested in test_overtake_contact).
+    events = engine.app.race_events.model_copy(update={"contact_p": 0.0})
+    engine.app = engine.app.model_copy(update={"race_events": events})
     return engine, engine.run()
 
 

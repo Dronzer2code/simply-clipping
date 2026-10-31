@@ -36,6 +36,9 @@ class _Recorder(RaceEngine):
 def race() -> _Recorder:
     engine = _Recorder(RaceSetup(fuel_kg=FULL_RACE_FUEL_KG, our_driver_id="VER"), CONFIG_DIR)
     engine.start_compounds = list(engine.compounds)
+    # Every Rival races to the flag: no overtake contacts (T-038, test_overtake_contact).
+    events = engine.app.race_events.model_copy(update={"contact_p": 0.0})
+    engine.app = engine.app.model_copy(update={"race_events": events})
     engine.run()
     return engine
 

@@ -41,6 +41,10 @@ HORIZON_LAPS = 6  # the scope's fallback (8 laps: ~30 s per refresh on the 8 GB 
 BOX_PLANS: tuple[tuple[PitPlan, int], ...] = (("BOX_NOW", 0), ("BOX_+1", 1), ("BOX_+2", 2),
                                               ("BOX_+3", 3))  # fmt: skip
 DRY = (Compound.SOFT, Compound.MEDIUM, Compound.HARD)
+WET_SET = (Compound.MEDIUM, Compound.INTERMEDIATE, Compound.WET)
+"""Compounds the panel tries on a wet track (E1)."""
+WET_TRACK = 0.1
+"""Track wetness from which the panel offers the wet compounds (STRUCTURAL, E1)."""
 MJ = 1e6
 RESEEDED = ("overtake", "mistakes", "pit", "rival_strategy", "events")
 
@@ -91,6 +95,8 @@ def public_snapshot(snap: Snapshot, our: str, info: PublicInfo) -> Snapshot:
         book.stops_done[k] = stops
         book.stop_lap[k] = prior_stop
         book.harvesting[k] = False
+        book.wet_delay_laps[k] = 0  # public prior: boxes at the wet crossover (E1, HR-03)
+        book.wet_due_lap[k] = -1
     for i, d in enumerate(engine.driver_ids):
         if d != our and st.running[i]:
             engine._set_plan(i, engine._plan_car(i))
@@ -98,9 +104,14 @@ def public_snapshot(snap: Snapshot, our: str, info: PublicInfo) -> Snapshot:
 
 
 def plans_for(engine: RaceEngine) -> list[tuple[PitPlan, Compound | None]]:
-    """STAY_OUT, then every box timing with every available dry compound."""
+    """STAY_OUT, then every box timing with every available dry compound.
+
+    On a wet track (rain falling or the track not yet dry: public, E1) the
+    compounds are MEDIUM, INTERMEDIATE and WET instead, so the panel stays at 13 plans.
+    """
     ctx = engine.command_context()
-    compounds = [c for c in DRY if c in ctx.compounds]
+    wet = engine.weather.condition != "DRY" or engine.weather.track_wetness >= WET_TRACK
+    compounds = [c for c in (WET_SET if wet else DRY) if c in ctx.compounds]
     out: list[tuple[PitPlan, Compound | None]] = [("STAY_OUT", None)]
     return out + [(plan, c) for plan, _ in BOX_PLANS for c in compounds]
 

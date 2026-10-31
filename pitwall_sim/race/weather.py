@@ -22,6 +22,13 @@ Forecast (everyone sees the same): the chance of rain within
 ``forecast_horizon_s``, from the chain, plus Gaussian noise of
 ``forecast_noise_sd``, clipped to 0..1, renewed every step.
 
+Forced rain (hackathon E1, "Rain from lap N" on the setup screen): the race starts
+dry with the rain *pending* (the forecast already follows the chain); the engine
+calls :meth:`WeatherModel.start_rain` when the leader starts lap N. The condition
+jumps to ``forced_rain_condition`` and holds there ``forced_rain_hold_s`` before
+the track's chain moves it on; the wetness then rises as usual, so the slick /
+intermediate crossover comes a lap or two later.
+
 All randomness comes from the RNG stream ``weather`` (HR-04).
 """
 
@@ -72,6 +79,18 @@ def crossover_wetness(tyres: TyreConfig, a: Compound, b: Compound) -> float | No
     return d0 / (d0 - d1)
 
 
+WET_COMPOUNDS: tuple[Compound, ...] = (Compound.INTERMEDIATE, Compound.WET)
+
+
+def best_compound(tyres: TyreConfig, wetness: float, slick: Compound) -> Compound:
+    """Grippiest of ``slick``, INTERMEDIATE and WET at ``wetness`` (ties keep the drier one).
+
+    The crossovers are where this changes; they come from the grip curves only.
+    """
+    options = [slick, *(c for c in WET_COMPOUNDS if c in tyres.compounds)]
+    return max(options, key=lambda c: absolute_grip(tyres, c, wetness))
+
+
 @dataclass
 class WeatherModel:
     """One race's weather (mutates its :class:`WeatherState`)."""
@@ -85,6 +104,9 @@ class WeatherModel:
     rainy: bool
     forecast_p: float = 0.0
     _since_step_s: float = 0.0
+    rain_pending: bool = False
+    """Forced rain still to come (dry until :meth:`start_rain`)."""
+    _hold_s: float = 0.0
 
     @classmethod
     def for_race(
@@ -123,9 +145,10 @@ class WeatherModel:
         st, cfg = self.state, self.cfg
         changed = False
         self._since_step_s += dt_s
+        self._hold_s = max(self._hold_s - dt_s, 0.0)
         while self._since_step_s >= cfg.step_s:
             self._since_step_s -= cfg.step_s
-            if self.rainy:
+            if self.rainy and self._hold_s <= 0.0:
                 row = self.matrix[CONDITIONS.index(st.condition)]
                 new = CONDITIONS[int(np.searchsorted(np.cumsum(row), self.rng.random()))]
                 changed |= new != st.condition
@@ -146,11 +169,19 @@ class WeatherModel:
         """Chance of rain (any condition but DRY) within the forecast horizon."""
         if self.state.condition != "DRY":
             return 1.0
-        if not self.rainy:
+        if not (self.rainy or self.rain_pending):
             return 0.0
         steps = self.cfg.forecast_horizon_s / self.cfg.step_s
         stay = float(self.matrix[0, 0])
         return 1.0 - float(stay**steps)
+
+    def start_rain(self) -> None:
+        """Start the forced rain now: ``forced_rain_condition``, held ``forced_rain_hold_s``."""
+        self.rainy, self.rain_pending = True, False
+        self.state.condition = self.cfg.forced_rain_condition
+        self._hold_s = self.cfg.forced_rain_hold_s
+        self.forecast_p = self._publish()
+        logger.info("weather: forced rain, %s", self.state.condition)
 
     def _publish(self) -> float:
         noise = float(self.rng.normal(0.0, self.cfg.forecast_noise_sd))

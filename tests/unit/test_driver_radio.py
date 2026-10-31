@@ -14,11 +14,12 @@ SM2_START = 4082.0  # Suzuka's back straight (an acceleration zone over 600 m)
 
 
 def _view(t: float, place: int = 5, battery: float = 3.0, wear: float = 0.2,
-          s_m: float = 2000.0, lap: int = 3) -> Any:  # fmt: skip
+          s_m: float = 2000.0, lap: int = 3, condition: str = "DRY") -> Any:  # fmt: skip
     order = [f"C{k}" for k in range(1, 23)]
     order.insert(place - 1, "US")
     car = SimpleNamespace(lap=lap, s_m=s_m, battery_mj=battery, tyre_wear=wear)
-    return SimpleNamespace(t_s=t, our_car=car, timing=SimpleNamespace(order=order[:22]))
+    return SimpleNamespace(t_s=t, our_car=car, timing=SimpleNamespace(order=order[:22]),
+                           weather_public=SimpleNamespace(condition=condition))  # fmt: skip
 
 
 def test_triggers_and_rate_limit() -> None:
@@ -40,3 +41,14 @@ def test_low_battery_only_before_a_long_straight() -> None:
     radio = DriverRadio("US", TRACK)
     radio.update(_view(0.0))
     assert radio.update(_view(30.0, battery=0.3, s_m=2500.0)) is None  # in the esses
+
+
+def test_rain_line_names_the_corner_ahead_and_is_not_rate_limited() -> None:
+    """E1: the driver calls the rain at once, at the next corner (T7 Dunlop at s 1845 m)."""
+    radio = DriverRadio("US", TRACK)
+    radio.update(_view(0.0))
+    assert radio.update(_view(5.0, place=4)) == "Up to P4."
+    rain = radio.update(_view(8.0, place=4, s_m=1800.0, condition="WET"))
+    assert rain == "Rain at Turn 7, it's getting slippery."
+    assert radio.update(_view(9.0, place=4, condition="HEAVY_WET")) is None  # still raining
+    assert radio.update(_view(12.0, place=4, condition="DRY")) == "Rain's stopped."
