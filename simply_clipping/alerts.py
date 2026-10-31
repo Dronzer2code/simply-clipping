@@ -32,6 +32,7 @@ Every alert carries its evidence, confidence and branch.
 
 from __future__ import annotations
 
+import dataclasses
 from dataclasses import asdict, dataclass
 
 import numpy as np
@@ -104,6 +105,31 @@ class AlertRow:
     last_clip_s_m: float | None
     detection_share: float | None
     need_mj: float | None
+    radio: str = ""
+    """One-line radio call (:func:`radio_line`)."""
+
+
+def radio_line(row: AlertRow) -> str:
+    """Return the engineer's call: at most ``alerts.radio_max_words`` words, evidence only.
+
+    Template-based (owner SC-6: Gemma only if set up; it is not, so templates).
+    """
+    corner = row.corner_id or "the next corner"
+    rival, our = row.car_b, row.our_mj
+    their = row.rival_mj if row.rival_mj is not None else 0.0
+    if row.type == "ATTACK":
+        if row.branch.startswith("energy"):
+            return f"{rival} has {their:.1f} MJ, we have {our:.1f}. Attack into {corner}."
+        return f"{rival} clipped here last lap. Attack into {corner}."
+    if row.type == "DEFEND":
+        if row.branch.startswith("energy"):
+            return f"{rival} behind has {their:.1f} MJ, we have {our:.1f}. Defend {corner}."
+        need = row.need_mj if row.need_mj is not None else 0.0
+        return f"We have {our:.1f} MJ, straight needs {need:.1f}. Defend {corner}."
+    if row.type == "REPASS_RISK":
+        return f"Only {our:.1f} MJ, long straight ahead. {rival} can re-pass."
+    dv = abs(row.dv_kmh) if row.dv_kmh is not None else 0.0
+    return f"Closing {dv:.0f} km/h on {rival}. Careful into {corner}."
 
 
 def our_state(us: Us, cfg: Config) -> int:
@@ -151,26 +177,25 @@ class Engine:
             if self.suppressed.get(key, -np.inf) > us.progress_m:
                 return
             self.suppressed[key] = us.progress_m + float(self.c["suppress_laps"]) * lap_m
-            out.append(
-                AlertRow(
-                    us.t_s,
-                    us.lap,
-                    kind,
-                    self.our,
-                    n.driver,
-                    float(np.clip(conf, 0.0, 1.0)),
-                    branch,
-                    corner,
-                    us.battery_mj,
-                    n.energy_mj,
-                    (us.v_ms - n.v_ms) * KMH,
-                    n.gap_s,
-                    STATES[n.state],
-                    ev.get("clip_s"),
-                    ev.get("share"),
-                    ev.get("need"),
-                )
+            fired = AlertRow(
+                us.t_s,
+                us.lap,
+                kind,
+                self.our,
+                n.driver,
+                float(np.clip(conf, 0.0, 1.0)),
+                branch,
+                corner,
+                us.battery_mj,
+                n.energy_mj,
+                (us.v_ms - n.v_ms) * KMH,
+                n.gap_s,
+                STATES[n.state],
+                ev.get("clip_s"),
+                ev.get("share"),
+                ev.get("need"),
             )
+            out.append(dataclasses.replace(fired, radio=radio_line(fired)))
 
         if ahead is not None and ahead.gap_s <= float(self.c["attack_gap_s"]):
             branches, conf, ev = [], 0.0, {}
@@ -273,8 +298,11 @@ class Engine:
         on_straight = bool(self.track.zone_index(np.array([s_now]), "acceleration_zone")[0] >= 0)
         if bool(self.c["closing_on_straight"]) and not on_straight:
             nbrs = []  # corner entries: the car ahead lifts while we are still on power
+        v_min = float(self.c["closing_min_speed_kmh"]) / KMH
         for n in nbrs:
             if abs(n.distance_m) > float(self.c["closing_range_m"]):
+                continue
+            if min(n.v_ms, us.v_ms) < v_min:  # a car at pit-limiter speed is in the pit lane
                 continue
             closing = (us.v_ms - n.v_ms) if n.distance_m > 0 else (n.v_ms - us.v_ms)
             dv = closing * KMH

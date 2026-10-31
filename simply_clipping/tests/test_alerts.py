@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
+import re
 from types import SimpleNamespace
 
 import numpy as np
 import pytest
 
-from simply_clipping.alerts import AlertRow, Engine, OwnTrack, offline_alerts
+from simply_clipping.alerts import AlertRow, Engine, OwnTrack, offline_alerts, radio_line
 from simply_clipping.battles import History
 from simply_clipping.energy import CLIP, CRUISE, LIFT, CarTracker, Estimates, calibrated
 from simply_clipping.live import Provider
@@ -232,3 +233,24 @@ def test_live_and_offline_give_the_same_alerts() -> None:
     off = sorted((r.time_s, r.type, r.car_b, r.branch) for r in offline if r.time_s <= horizon)
     assert off, "the race should raise alerts"
     assert live == off
+
+
+@pytest.mark.parametrize("corner", ["T1", None])
+@pytest.mark.parametrize(("kind", "branch"), [
+    ("ATTACK", "energy"), ("ATTACK", "observed clip"), ("DEFEND", "energy"),
+    ("DEFEND", "own battery"), ("REPASS_RISK", "repass"), ("CLOSING_SPEED_RISK", "closing"),
+])  # fmt: skip
+def test_radio_line_is_short_and_states_only_evidence(kind: str, branch: str,
+                                                       corner: str | None) -> None:  # fmt: skip
+    """SC-6: one line, at most 12 words, every number from the alert's evidence."""
+    row = AlertRow(100.0, 3, kind, "US", "VER", 0.8, branch, corner, 2.94, 1.23, -45.6, 0.4,
+                   "CLIP", None, 0.9, 3.81)  # fmt: skip
+    line = radio_line(row)
+    assert "\n" not in line and len(line.split()) <= int(CFG["alerts"]["radio_max_words"]), line
+    allowed = {"2.9", "1.2", "46", "3.8"}
+    assert set(re.findall(r"\d+\.\d|\d{2,}", line)) <= allowed, line
+
+
+def test_alerts_carry_their_radio_line() -> None:
+    rows = _fire(_own(P_US, 3.0), {"AAA": _hist(P_US + 40.0, 1.0, 0.8)}, 10.0)
+    assert rows and all(r.radio == radio_line(r) and r.radio for r in rows)

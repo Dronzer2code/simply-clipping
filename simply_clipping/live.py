@@ -54,6 +54,8 @@ class LiveAlert:
     confidence: float
     created_t: float
     expires_t: float
+    radio: str = ""
+    """Simply Clipping's one-line call (the pit wall shows it as the headline)."""
 
 
 def to_live(row: AlertRow, cfg: Config) -> LiveAlert:
@@ -80,6 +82,7 @@ def to_live(row: AlertRow, cfg: Config) -> LiveAlert:
         row.confidence,
         row.time_s,
         expires,
+        row.radio,
     )
 
 

@@ -133,11 +133,13 @@ alerts: # RADAR / SPRINT Part 2
   closing_counts_no_deploy: false # TUNE (SC-3): the slow car may also be at full throttle without deploy (empty)
   closing_slow_states: [CLIP, LIFT] # owner SC-3: the slower car's states
   closing_fast_states: [DEPLOY] # owner SC-3: the faster car's states
+  closing_min_speed_kmh: 120.0 # STRUCTURAL (SC-6 fix): a slower car below this is in the pit lane (beside the straight)
   tick_s: 0.5 # STRUCTURAL: the rules are evaluated every this many seconds (bench and pit wall alike)
   latency_s: 2.0 # STRUCTURAL: live, a tick is evaluated this long after it (feed batch + 0.3 s smoothing look-ahead)
   feed_batch_s: 1.0 # STRUCTURAL: live, rival frames go to the trackers once per this much race time (speed)
   own_rate_s: 1.0 # STRUCTURAL: our deploy / acceleration from our own data over this window
   history_s: 600.0 # STRUCTURAL: live, each car keeps this much history (a lap is ~110 s)
+  radio_max_words: 12 # owner SC-6: a radio call is one line of at most 12 words
 
 output:
   estimates_hz: 1.0 # BRIDGE: once a second per car is plenty
