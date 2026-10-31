@@ -240,6 +240,16 @@ Fix: no strategy refresh / Reveal sampling after the chequered flag (found in th
 owner's live run, `data/runs/live_20261031_s42_VER_l15/NOTES.md`). Pitch:
 `docs/PITCH.md`. Still open: LLM provider + key, H8 backup video, lapped-car rule.
 
+Owner asked the agent to choose (2026-10-31): E3 "lap N" stays = the leader starting
+lap N (F1 timing convention, "LAP 30/53"). Tyre model checked: no bug (dry, laps 3-4
+before any stop, seeds 1-3: SOFT 0.051, MEDIUM 0.032, HARD 0.022 wear/lap; the "HARD
+faster than MEDIUM" reading mixed in post-stop compounds), so `real_race.wear_per_lap`
+was corrected to those values. Lapped-car rule: not built (nobody is lapped in a
+15-lap race or from lap 30). WET tyres: left to calibration (HR-09; INTER beats WET
+with the placeholders). Checks kept under `data/runs/_tools/` (gitignored):
+`rehearse_demo.py` (headless DEMO_HACKATHON run, matched the script) and
+`ui_smoke.py` (setup screen → pit wall, 4 scenarios, 22 checks, all OK).
+
 ## KNOWN ISSUES
 
 - Full race distance: every car runs out of fuel at laps 41-46 of 53 (DNF "out

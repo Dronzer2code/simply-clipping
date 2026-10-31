@@ -879,11 +879,11 @@ class RealRaceConfig(StrictModel):
     """Every car's battery at the moment: the race-start prior (assumed full)."""
     wear_per_lap: dict[Compound, Fraction] = Field(
         default_factory=lambda: {
-            Compound.SOFT: 0.018,
-            Compound.MEDIUM: 0.018,
-            Compound.HARD: 0.026,
-            Compound.INTERMEDIATE: 0.018,
-            Compound.WET: 0.018,
+            Compound.SOFT: 0.051,
+            Compound.MEDIUM: 0.032,
+            Compound.HARD: 0.022,
+            Compound.INTERMEDIATE: 0.038,
+            Compound.WET: 0.032,
         }
     )
     """Tyre wear = tyre age x this (the sim's own wear per lap on Suzuka)."""

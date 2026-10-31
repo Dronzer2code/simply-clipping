@@ -444,12 +444,12 @@ real_race:
   session_key: 11253 # SOURCE: OpenF1 session_key of the 2026 Japanese GP race (as simply_clipping/real_data.py)
   default_lap: 30 # HAND-SET: "you are on the pit wall at lap 30"
   battery_fraction: 1.0 # HAND-SET: no real battery data; the race-start prior (full, as the Radar's start prior)
-  wear_per_lap: # HAND-SET: the sim's own Suzuka wear per lap (6-lap dry runs, seed 1, fleet mean, 2026-10-31); wear = tyre age x this
-    SOFT: 0.018 # HAND-SET (PLACEHOLDER: calibrate with the tyre model)
-    MEDIUM: 0.018 # HAND-SET (PLACEHOLDER: calibrate with the tyre model)
-    HARD: 0.026 # HAND-SET (PLACEHOLDER: calibrate with the tyre model)
-    INTERMEDIATE: 0.018 # PLACEHOLDER: not measured (dry race)
-    WET: 0.018 # PLACEHOLDER: not measured (dry race)
+  wear_per_lap: # HAND-SET: the sim's own Suzuka wear per lap (dry, laps 3-4 before any stop, seeds 1-3, fleet mean, 2026-10-31; the first measurement mixed in post-stop compounds); wear = tyre age x this
+    SOFT: 0.051 # HAND-SET (PLACEHOLDER: calibrate with the tyre model)
+    MEDIUM: 0.032 # HAND-SET (PLACEHOLDER: calibrate with the tyre model)
+    HARD: 0.022 # HAND-SET (PLACEHOLDER: calibrate with the tyre model)
+    INTERMEDIATE: 0.038 # PLACEHOLDER: not measured (dry race); MEDIUM x k_wear ratio 1.2
+    WET: 0.032 # PLACEHOLDER: not measured (dry race); MEDIUM x k_wear ratio 1.0
   fuel_per_lap_kg: 1.75 # HAND-SET: sim burn on Suzuka 1.63 kg/lap mean, 1.74 max (same runs); fuel_start_kg is T-02B
   fuel_margin_kg: 2.0 # HAND-SET: T-02B target of 0.5-2 kg left at the flag
   min_spacing_m: 8.0 # HAND-SET: as race_engine.grid_slot_spacing_m; no two cars on the same spot
