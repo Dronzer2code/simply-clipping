@@ -401,3 +401,20 @@ calibration:
     pu_power_scale: [0.97, 1.03]
     # Tyre load sensitivity exponent (owner round 14: plausible 0.05-0.30).
     k_load: [0.05, 0.30]
+
+real_race:
+  # Hackathon E3 "Real race moment": start the race from a real 2026 lap (OpenF1,
+  # light PF-18). Real timing gives order, gaps, laps, tyres and stops; real data
+  # has no battery, tyre wear or fuel, so those are the defaults below (HR-09).
+  session_key: 11253 # SOURCE: OpenF1 session_key of the 2026 Japanese GP race (as simply_clipping/real_data.py)
+  default_lap: 30 # HAND-SET: "you are on the pit wall at lap 30"
+  battery_fraction: 1.0 # HAND-SET: no real battery data; the race-start prior (full, as the Radar's start prior)
+  wear_per_lap: # HAND-SET: the sim's own Suzuka wear per lap (6-lap dry runs, seed 1, fleet mean, 2026-10-31); wear = tyre age x this
+    SOFT: 0.018 # HAND-SET (PLACEHOLDER: calibrate with the tyre model)
+    MEDIUM: 0.018 # HAND-SET (PLACEHOLDER: calibrate with the tyre model)
+    HARD: 0.026 # HAND-SET (PLACEHOLDER: calibrate with the tyre model)
+    INTERMEDIATE: 0.018 # PLACEHOLDER: not measured (dry race)
+    WET: 0.018 # PLACEHOLDER: not measured (dry race)
+  fuel_per_lap_kg: 1.75 # HAND-SET: sim burn on Suzuka 1.63 kg/lap mean, 1.74 max (same runs); fuel_start_kg is T-02B
+  fuel_margin_kg: 2.0 # HAND-SET: T-02B target of 0.5-2 kg left at the flag
+  min_spacing_m: 8.0 # HAND-SET: as race_engine.grid_slot_spacing_m; no two cars on the same spot

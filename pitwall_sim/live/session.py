@@ -42,6 +42,7 @@ from pitwall_sim.observe.alerts import Alert, make_provider
 from pitwall_sim.observe.engineer_view import EngineerView, EngineerViewBuilder
 from pitwall_sim.race.engine import RaceEngine, RaceSetup
 from pitwall_sim.race.snapshot import Snapshot
+from pitwall_sim.replay import real_race
 
 MJ = 1e6
 #: Driver radio when the track status changes (H4, templates).
@@ -73,6 +74,9 @@ class LiveSetup:
     """Force a Safety Car on this lap (demo); ``None`` = ``demo.scripted_sc_lap``."""
     strategy: bool = False
     """Run the strategy panel's background forks (H5); the pit wall turns it on."""
+    real_lap: int | None = None
+    """Real race moment (E3): start at this lap of the real 2026 Japanese GP (OpenF1);
+    order, gaps, tyres and stops from the real race. ``None`` = a normal race."""
 
 
 @dataclass(frozen=True)
@@ -179,14 +183,16 @@ class LiveSession:
         s = self.setup
         grid_cfg = load_grid("real_2026", self.config_dir)
         default = tuple(d.driver_id for t in grid_cfg.teams for d in t.drivers)
-        self.engine = RaceEngine(
-            RaceSetup(track_id=s.track_id, rule_set_id=s.rule_set_id, seed=s.seed, laps=s.laps,
-                      fuel_kg=s.fuel_kg, our_driver_id=s.our_driver_id,
-                      scripted_sc_lap=s.scripted_sc_lap,
-                      grid_order=presets.grid_order(s.preset, s.our_driver_id, default)),
-            self.config_dir,
+        race_setup = RaceSetup(
+            track_id=s.track_id, rule_set_id=s.rule_set_id, seed=s.seed, laps=s.laps,
+            fuel_kg=s.fuel_kg, our_driver_id=s.our_driver_id, scripted_sc_lap=s.scripted_sc_lap,
+            grid_order=presets.grid_order(s.preset, s.our_driver_id, default),
         )  # fmt: skip
-        self.preset_rival = presets.apply(s.preset, self.engine, s.our_driver_id)
+        if s.real_lap is not None:  # E3 real race moment (presets do not apply)
+            race_setup = real_race.real_setup(race_setup, s.real_lap, self.config_dir)
+        self.engine = RaceEngine(race_setup, self.config_dir)
+        preset: Preset = s.preset if s.real_lap is None else "none"
+        self.preset_rival = presets.apply(preset, self.engine, s.our_driver_id)
         self._lock = threading.RLock()
         self._builder = EngineerViewBuilder(self.engine, s.our_driver_id)
         eng = self.engine

@@ -73,6 +73,7 @@ from pitwall_sim.race.state import (
     CarStatus,
     Flag,
     RaceState,
+    StartState,
     TimingState,
     TrackStatus,
     TrackStatusName,
@@ -158,6 +159,9 @@ class RaceSetup:
     """``auto``: rainy with the track's ``rain_p_per_race``; ``dry`` / ``rain`` force it."""
     scripted_sc_lap: int | None = None
     """Force a Safety Car when the leader starts this lap; ``None`` = ``demo.scripted_sc_lap``."""
+    start: StartState | None = None
+    """Pick the race up mid-way (E3 real race moment); ``None`` = standing start.
+    ``grid_order`` must then list the cars in ``start.cars`` order."""
 
 
 @dataclass
@@ -204,6 +208,32 @@ class _Timing:
         self.lap_times = [[] for _ in range(self.n)]
 
 
+def start_positions(
+    start: StartState, order: Sequence[str], length_m: float
+) -> tuple[npt.NDArray[np.int64], FloatArray]:
+    """``(laps_done, s_m)`` per car of ``order`` at a mid-race start (E3).
+
+    Track position = completed laps x length + lap share x length; a running car
+    closer than ``start.min_spacing_m`` to the running car ahead of it is moved back
+    to that spacing. Retired cars keep their position (they are off the road).
+    """
+    by_id = {c.driver_id: c for c in start.cars}
+    progress = {c.driver_id: (c.laps_done + c.lap_fraction) * length_m for c in start.cars}
+    ahead: float | None = None
+    for car in start.cars:  # running order
+        if car.retired:
+            continue
+        if ahead is not None:
+            progress[car.driver_id] = min(progress[car.driver_id], ahead - start.min_spacing_m)
+        ahead = progress[car.driver_id]
+    laps = np.array([math.floor(progress[d] / length_m) for d in order], dtype=np.int64)
+    s_m = np.array([progress[d] for d in order], dtype=np.float64) - laps * length_m
+    for k, d in enumerate(order):
+        if by_id[d].retired:
+            laps[k] = by_id[d].laps_done
+    return laps, s_m
+
+
 class RaceEngine:
     """One race: config, kernel arrays, AI Drivers, timing (PF-04)."""
 
@@ -246,6 +276,12 @@ class RaceEngine:
         n = self.n = len(order)
         compound = setup.start_compound or eng.start_compound
         self.compounds = [compound] * n
+        start = setup.start
+        start_cars = {c.driver_id: c for c in start.cars} if start is not None else {}
+        if start is not None:
+            if sorted(start_cars) != sorted(order):
+                raise ConfigError("start state must list every car on the grid")
+            self.compounds = [start_cars[d].compound for d in order]
 
         # Track with timing loops: sector ends, detection points, mini-sectors.
         mini = np.arange(eng.timing_loop_spacing_m, length - 1.0, eng.timing_loop_spacing_m)
@@ -283,6 +319,12 @@ class RaceEngine:
         battery = self.cars.e_usable_max_j * eng.start_battery_fraction
         self.st = K.initial_state(n, grid_s, [0.0] * n, battery, [float(fuel)] * n, loops)
         self.st.lap[:] = -1
+        if start is not None:  # mid-race: real positions, laps and tyres (E3)
+            laps_done, s_m = start_positions(start, order, length)
+            battery = self.cars.e_usable_max_j * start.battery_fraction
+            self.st = K.initial_state(n, s_m, [0.0] * n, battery, [float(fuel)] * n, loops)
+            self.st.lap[:] = laps_done
+            self.st.tyre_wear[:] = [start_cars[d].tyre_wear for d in order]
         self.ctl = K.default_controls(n)
 
         # RNG streams (HR-04) and drivers.
@@ -302,6 +344,8 @@ class RaceEngine:
         self._retired = np.zeros(n, dtype=np.bool_)
         self.retired: dict[int, str] = {}
         self.tyre_laps = np.zeros(n, dtype=np.int64)
+        if start is not None:
+            self.tyre_laps[:] = [start_cars[d].tyre_age_laps for d in order]
         self._plan_cache: dict[tuple[object, ...], D.CarPlan] = {}
         self._planned_grip = np.ones(n)
         self._weather_lap = -1
@@ -311,6 +355,10 @@ class RaceEngine:
         car_plans = [self._plan_car(i) for i in range(n)]
         self.car_plans = car_plans
         self.plans = D.kernel_plans(car_plans)
+        if start is not None:  # a flying start: every car at its planned speed
+            k = (self.st.s_m / self.trk.ds_m).astype(np.int64)
+            for i, plan in enumerate(car_plans):
+                self.st.v_ms[i] = float(plan.v_ref[int(k[i]) % plan.v_ref.size])
 
         # Overtakes (T-034) and pit stops (T-035).
         skill = {d.driver_id: d.skill_racecraft for t in self.grid.teams for d in t.drivers}
@@ -336,6 +384,14 @@ class RaceEngine:
             self.app.rival_strategy, self.rngs["rival_strategy"],
         )  # fmt: skip
         self.rival_plans.pop(str(setup.our_driver_id), None)
+        for driver, rival in self.rival_plans.items():  # mid-race: stops already made
+            if driver in start_cars:
+                car = start_cars[driver]
+                rival.stops_done = car.pit_stops
+                rival.stop_lap = max(rival.stop_lap, car.laps_done)
+                rival.next_compound = (
+                    Compound.HARD if car.compound != Compound.HARD else Compound.MEDIUM
+                )
         self.rival_book = RS.RivalBook.from_plans(self.rival_plans, self.driver_ids)
         if setup.our_driver_id is not None and setup.our_driver_id not in self.driver_ids:
             raise ConfigError(f"our_driver_id {setup.our_driver_id} is not on the grid")
@@ -392,6 +448,10 @@ class RaceEngine:
         self.finish_order: list[int] = []
         self.timing = _Timing(n)
         self.timing.lap_battery_j[:] = self.st.battery_j
+        self.prior_pit_stops = np.zeros(n, dtype=np.int64)
+        """Stops made before the race was picked up mid-way (E3)."""
+        if start is not None:
+            self._start_timing(start)
         self._prev_next = self.st.next_loop.copy()
         self._prev_lap = self.st.lap.copy()
         self._classification = np.arange(n)
@@ -425,6 +485,20 @@ class RaceEngine:
         """One per lap, taken when the leader crosses the timing line (PF-04)."""
         self.auto_snapshot = True
         self._leader_lap = False
+        for d, car in start_cars.items():
+            if car.retired:
+                self.retire(self.driver_ids.index(d), "retired before the start lap")
+
+    def _start_timing(self, start: StartState) -> None:
+        """Public timing at a mid-race start: each car's last line crossing and gaps."""
+        tm = self.timing
+        for car in start.cars:
+            i = self.driver_ids.index(car.driver_id)
+            tm.line_t[i] = tm.sector_start_t[i] = -car.lap_elapsed_s
+            tm.gap_s[i], tm.interval_s[i] = car.gap_s, car.interval_s
+            self.prior_pit_stops[i] = car.pit_stops
+            if not car.retired:
+                tm.crossings.setdefault((car.laps_done, LINE), {})[i] = -car.lap_elapsed_s
 
     # ------------------------------------------------------------------ #
     # Driver plans
@@ -1384,7 +1458,7 @@ class RaceEngine:
 
     def pit_stops(self, i: int) -> int:
         """Completed pit stops of car ``i`` (public timing)."""
-        return sum(
+        return int(self.prior_pit_stops[i]) + sum(
             1 for e in self.pit.events if e.car == i and e.phase == PitPhase.RUNNING and e.compound
         )
 
