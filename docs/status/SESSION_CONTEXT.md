@@ -221,6 +221,25 @@ installed). Known: no undercut window in 15-lap races (tyre wear placeholders
 too low); strategy refresh ~25 s (stale by ~3 laps at 16x); 16x frames p99
 ~30-110 ms with the strategy workers and the post-flag cost thread.
 
+2026-10-31, branch `hack/features` (from main `f08cf4f`; four parallel builds,
+merged): **H2/H3** hosted LLM radio + LLM driver replies (`radio/hosted_llm.py`,
+`llm_commands.py`, `llm_replies.py`, `live/radio_ai.py`; config `radio_llm`, provider
+`null` = off until the owner picks OpenAI or Anthropic and sets the key env var;
+LLM → `validate()` → queue, 2 s timeout → keyword parser) and push-to-talk
+(`radio/stt.py`, faster-whisper `base.en` in `models/stt`, hold `` ` ``; config
+`voice_input`; extras `[llm]`, `[voice]`). **H6** Telemetry tab (speed, throttle,
+battery vs lap distance, previous-lap ghost; `ui/telemetry_plot.py`). **E1** rain race
+("Rain from lap" on setup → `rain_lap`; Rivals box for inters 0-2 laps after the
+crossover; WET never beats INTER with the `tyres.yaml` placeholders) and **T-038**
+overtake contact (`race_events.contact_*`, HAND-SET; LIGHT / VSC / SC). **E2** engineer
+score in the Reveal (`debrief/scorer.py`, `100·exp(−Σloss/score_scale_s)`). **E3** real
+race moment (`replay/real_race.py`, OpenF1 session 11253, "Real race moment" + lap on
+setup, `python -m pitwall_sim.replay.real_race --lap 30 --our NOR`; "lap N" = the
+leader starting lap N, owner to confirm; config `real_race`, HAND-SET hidden state).
+Fix: no strategy refresh / Reveal sampling after the chequered flag (found in the
+owner's live run, `data/runs/live_20261031_s42_VER_l15/NOTES.md`). Pitch:
+`docs/PITCH.md`. Still open: LLM provider + key, H8 backup video, lapped-car rule.
+
 ## KNOWN ISSUES
 
 - Full race distance: every car runs out of fuel at laps 41-46 of 53 (DNF "out

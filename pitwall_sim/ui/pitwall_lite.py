@@ -1187,7 +1187,9 @@ class PitWallWindow(QMainWindow):
         self._radio_count = len(lines)
 
     def closeEvent(self, event: Any) -> None:  # noqa: N802 (Qt)
-        """Stop the sim thread and the background strategy processes."""
+        """Stop the sim thread, the decision-cost thread and the strategy processes."""
+        if self.summary_dialog is not None:  # a running QThread destroyed with it aborts Qt
+            self.summary_dialog.close()
         self.thread_.stop()
         self.thread_.wait(2000)
         self.session.close()
