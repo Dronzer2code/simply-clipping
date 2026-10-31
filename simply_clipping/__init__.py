@@ -17,8 +17,9 @@ from pathlib import Path
 
 import pandas as pd
 
-from simply_clipping.alerts import no_alerts
-from simply_clipping.energy import CarTracker, Estimates, estimates_frame
+from simply_clipping.alerts import OwnTrack, alerts_frame, no_alerts, offline_alerts
+from simply_clipping.battles import History
+from simply_clipping.energy import CarTracker, Estimates, calibrated, estimates_frame
 from simply_clipping.live import Provider, create
 from simply_clipping.loader import (
     Config,
@@ -28,6 +29,7 @@ from simply_clipping.loader import (
     load_config,
     load_feed,
     load_layout,
+    load_own,
 )
 
 __all__ = ["Provider", "create", "run"]
@@ -45,8 +47,39 @@ def run(
     (out_dir / "cda_fit.json").write_text(json.dumps(cda, indent=1), encoding="utf-8")
     frames = [estimates_frame(d, est, cfg) for d, est in per_car.items()]
     pd.concat(frames, ignore_index=True).to_parquet(out_dir / "estimates.parquet", index=False)
-    if our is not None:
+    if our is None:
+        return
+    if own_file is None:
         no_alerts().to_parquet(out_dir / "alerts.parquet", index=False)
+        return
+    histories = {d: history(est, cfg) for d, est in per_car.items() if d != our}
+    rows = offline_alerts(
+        histories, own_track(load_own(own_file, our), track, cfg), our, track, cfg
+    )
+    alerts_frame(rows).to_parquet(out_dir / "alerts.parquet", index=False)
+
+
+def history(est: Estimates, cfg: Config) -> History:
+    """Return a car's whole-race history, with stated confidence."""
+    hist = History()
+    hist.append(est, calibrated(est.raw_confidence, cfg))
+    return hist
+
+
+def own_track(own: pd.DataFrame, track: Track, cfg: Config) -> OwnTrack:
+    """Our exact own rows (``load_own``) as an :class:`OwnTrack`."""
+    out = OwnTrack(cfg, track.length_m)
+    for r in own.sort_values("time_s").itertuples(index=False):
+        out.add(
+            float(r.time_s),
+            int(r.lap),
+            float(r.lap_distance_m),
+            float(r.speed_kmh) / 3.6,
+            float(r.battery_mj),
+            100.0 * float(r.throttle),
+            bool(r.brake),
+        )
+    return out
 
 
 def track_race(
